@@ -48,11 +48,14 @@ main (int argc, char ** argv, char **envp) {
 
     //PARSING STARTS HERE | STORES TOKENS INTO ARRAY OF POINTERS
     for(int i = 0; i < 100; i++) {
-      tokenptr = strtok(cmd, " /t");
+      void* tokenptr = strtok(cmd, " /t");
       if(tokenptr == NULL)
         break;
       cmds[i] = tokenptr;
     }
+
+    //Placeholder so -Wall -Werror stops yelling at me
+    printf("%p", cmds);
 
 
     if (!rv) { 
@@ -62,6 +65,8 @@ main (int argc, char ** argv, char **envp) {
 
 
     // Execute the command, handling built-in commands separately 
+    //Built-in commands
+    
     // Just echo the command line for now
     write(1, cmd, strnlen(cmd, MAX_INPUT));
 
