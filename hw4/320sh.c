@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -11,6 +12,8 @@ main (int argc, char ** argv, char **envp) {
   int finished = 0;
   char *prompt = "320sh> ";
   char cmd[MAX_INPUT];
+
+  char* cmdDNE = ": command not found\n";
 
 
   while (!finished) {
@@ -41,7 +44,8 @@ main (int argc, char ** argv, char **envp) {
       if(last_char == 3) {
         write(1, "^c", 2);
       } else {
-	write(1, &last_char, 1);
+        // This line prints out the line that was read in. Don't need it. 
+	       //write(1, &last_char, 1);
       }
     } 
     *cursor = '\0';
@@ -67,12 +71,40 @@ main (int argc, char ** argv, char **envp) {
 
     // Execute the command, handling built-in commands separately 
     //Built-in commands
+    /* TODO Implement Built-in commands */
     char* exitCompare = "exit";
-    int exitStatus;
-    exitStatus = strcmp(cmdOne, exitCompare);
-    if(exitStatus == 0){
-      printf("SUCCESS!");
+    char* cdCompare = "cd";
+    char* pwdCompare = "pwd";
+    char* echoCompare = "echo";
+    char* setCompare = "help";
+    if(cmdOne == NULL){
+      /*  Input is just a newline.
+          Do nothing. 
+          It works because else statements. */
+    }else if(!strcmp(cmdOne, exitCompare)){
+      /* exit */
+      exit(0);
+    } else if(!strcmp(cmdOne, cdCompare)){
+      /* cd */
+
+    } else if(!strcmp(cmdOne, pwdCompare)){
+      /* pwd */
+
+    } else if(!strcmp(cmdOne, echoCompare)){
+      /* echo */
+
+    } else if(!strcmp(cmdOne, setCompare)){
+      /* set */
+
+    } else {
+      /* TODO Implement control flow to test if given command exists */
+      /* Non-built in commands */
+
+      /* Command does not exist */
+      write(1, cmd, strnlen(cmd, MAX_INPUT));
+      write(1, cmdDNE, strnlen(cmdDNE, MAX_INPUT));
     }
+
     // Just echo the command line for now
     //write(1, cmd, strnlen(cmd, MAX_INPUT));
 
