@@ -18,6 +18,7 @@ main (int argc, char ** argv, char **envp) {
     char last_char;
     int rv;
     int count;
+    char* cmds[100]; //Placeholder check w josh
 
 
     // Print the prompt
@@ -45,6 +46,15 @@ main (int argc, char ** argv, char **envp) {
     } 
     *cursor = '\0';
 
+    //PARSING STARTS HERE | STORES TOKENS INTO ARRAY OF POINTERS
+    for(int i = 0; i < 100; i++) {
+      tokenptr = strtok(cmd, " /t");
+      if(tokenptr == NULL)
+        break;
+      cmds[i] = tokenptr;
+    }
+
+
     if (!rv) { 
       finished = 1;
       break;
@@ -53,7 +63,7 @@ main (int argc, char ** argv, char **envp) {
 
     // Execute the command, handling built-in commands separately 
     // Just echo the command line for now
-    // write(1, cmd, strnlen(cmd, MAX_INPUT));
+    write(1, cmd, strnlen(cmd, MAX_INPUT));
 
   }
 
