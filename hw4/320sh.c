@@ -176,10 +176,34 @@ main (int argc, char ** argv, char **envp) {
     } else {
       /* TODO Implement control flow to test if given command exists */
       /* Non-built in commands */
+      char* paths[100];
+      char* path = getenv("PATH");
 
-      /* Command does not exist */
-      write(1, cmd, strnlen(cmd, MAX_INPUT));
-      write(1, cmdDNE, strnlen(cmdDNE, MAX_INPUT));
+      int pathsCount = 0;
+      int i;
+      for(i = 0; i < 100; i++) {
+        void* tokenptr;
+        if(i == 0)
+          tokenptr = strtok(path, ":");
+        else
+          tokenptr = strtok(NULL, ":");
+        if(tokenptr == NULL)
+          break;
+        paths[i] = tokenptr;
+        pathsCount++;
+      }
+      int pathFound = 0;
+      for(i = 0; i < pathsCount; i++){
+        // buffer contains the full filepath to check
+        //char* buffer = malloc(strlen(paths[i]) + strlen(cmdOne));
+      }
+      if(pathFound){
+
+      } else {
+        /* Command does not exist */
+        write(1, cmd, strnlen(cmd, MAX_INPUT));
+        write(1, cmdDNE, strnlen(cmdDNE, MAX_INPUT));
+      } 
     }
 
     // Just echo the command line for now
