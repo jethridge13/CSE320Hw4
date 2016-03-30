@@ -24,6 +24,8 @@ main (int argc, char ** argv, char **envp) {
     int rv;
     int count;
     char* cmds[100]; //Placeholder check w josh
+    /* TODO Delete this */
+    memset(cmds, 0, 100);
 
 
     // Print the prompt
@@ -54,7 +56,11 @@ main (int argc, char ** argv, char **envp) {
 
     //PARSING STARTS HERE | STORES TOKENS INTO ARRAY OF POINTERS
     for(int i = 0; i < 100; i++) {
-      void* tokenptr = strtok(cmd, " \t\n");
+      void* tokenptr;
+      if(i == 0)
+        tokenptr = strtok(cmd, " \t\n");
+      else
+        tokenptr = strtok(NULL, " \t\n");
       if(tokenptr == NULL)
         break;
       cmds[i] = tokenptr;
@@ -85,7 +91,10 @@ main (int argc, char ** argv, char **envp) {
       exit(0);
     } else if(!strcmp(cmdOne, cdCompare)){
       /* cd */
-
+      int returnCode = chdir(cmds[1]);
+      if(returnCode){
+        write(1, "Something went wrong.", MAX_INPUT);
+      }
     } else if(!strcmp(cmdOne, pwdCompare)){
       /* pwd */
       char pwdBuffer[PWD_BUFFER_SIZE];
