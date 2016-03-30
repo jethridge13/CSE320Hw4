@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
@@ -167,12 +169,12 @@ main (int argc, char ** argv, char **envp) {
       char* helpString = "help\t\tDisplay this help menu.\n";
       char* pwdString = "pwd\t\tPrint the current working directory.\n";
       char* setString = "set\t\tSet the value of environment variables.\n";
-      write(1, cdString, 42);
-      write(1, echoString, 54);
-      write(1, exitString, 23);
-      write(1, helpString, 30);
-      write(1, pwdString, 42);
-      write(1, setString, 45);
+      write(1, cdString, strlen(cdString));
+      write(1, echoString, strlen(echoString));
+      write(1, exitString, strlen(exitString));
+      write(1, helpString, strlen(helpString));
+      write(1, pwdString, strlen(pwdString));
+      write(1, setString, strlen(setString));
     } else {
       /* TODO Implement control flow to test if given command exists */
       /* Non-built in commands */
@@ -193,12 +195,29 @@ main (int argc, char ** argv, char **envp) {
         pathsCount++;
       }
       int pathFound = 0;
+      char* buffer;
       for(i = 0; i < pathsCount; i++){
         // buffer contains the full filepath to check
-        //char* buffer = malloc(strlen(paths[i]) + strlen(cmdOne));
+        buffer = malloc(strlen(paths[i]) + strlen(cmdOne) + 1);
+        strcpy(buffer, paths[i]);
+        strcat(buffer, "/");
+        strcat(buffer, cmdOne);
+        struct stat pathBuffer;
+        if(stat (buffer, &pathBuffer) == 0){
+          pathFound = 1;
+          break;
+        }
+        free(buffer);
       }
       if(pathFound){
-
+        int child_status;
+        pid_t childID = fork();
+        if(childID == 0){
+          execv(buffer, cmds);
+        } else {
+          waitpid(childID, &child_status, 0);
+          free(buffer);
+        }
       } else {
         /* Command does not exist */
         write(1, cmd, strnlen(cmd, MAX_INPUT));
