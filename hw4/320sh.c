@@ -6,6 +6,8 @@
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
 
+#define PWD_BUFFER_SIZE 100
+
 int 
 main (int argc, char ** argv, char **envp) {
 
@@ -58,10 +60,7 @@ main (int argc, char ** argv, char **envp) {
       cmds[i] = tokenptr;
     }
 
-    //Placeholder so -Wall -Werror stops yelling at me
     char* cmdOne = cmds[0];
-    //printf("%p", cmdOne);
-
 
     if (!rv) { 
       finished = 1;
@@ -89,7 +88,11 @@ main (int argc, char ** argv, char **envp) {
 
     } else if(!strcmp(cmdOne, pwdCompare)){
       /* pwd */
-
+      char pwdBuffer[PWD_BUFFER_SIZE];
+      memset(pwdBuffer, 0, PWD_BUFFER_SIZE);
+      getcwd(pwdBuffer, PWD_BUFFER_SIZE);
+      write(1, pwdBuffer, PWD_BUFFER_SIZE);
+      write(1, "\n", 1);
     } else if(!strcmp(cmdOne, echoCompare)){
       /* echo */
 
