@@ -32,6 +32,7 @@ main (int argc, char ** argv, char **envp) {
   memset(previousWD, 0, PWD_BUFFER_SIZE);
   getcwd(previousWD, PWD_BUFFER_SIZE);
 
+  setenv("?", "0", 1);
 
   while (!finished) {
     char *cursor;
@@ -134,8 +135,16 @@ main (int argc, char ** argv, char **envp) {
         strcpy(previousWD, temp);
       }
       if(returnCode){
-        write(1, "Something went wrong.\n", 22);
+        char* status1 = "cd: ";
+        char* status2 = ": No such file or directory\n";
+        write(1, status1, strlen(status1));
+        write(1, cmds[1], strlen(cmds[1]));
+        write(1, status2, strlen(status2));
       }
+
+      char returnCodeString[4];
+      sprintf(returnCodeString, "%d", returnCode);
+      setenv("?", returnCodeString, 1);
       debugEnd("CD", returnCode);
     } else if(!strcmp(cmdOne, pwdCompare)){
       /* pwd */
@@ -147,12 +156,19 @@ main (int argc, char ** argv, char **envp) {
       write(1, pwdBuffer, PWD_BUFFER_SIZE);
       write(1, "\n", 1);
 
+      char returnCodeString[4];
+      sprintf(returnCodeString, "%d", 0);
+      setenv("?", returnCodeString, 1);
       debugEnd("pwd", 0);
     } else if(!strcmp(cmdOne, echoCompare)){
       /* echo */
       debugRun("echo");
 
-      char* variable = getenv(cmds[1]);
+      char* variable = NULL;
+      if(cmds[1][0] == '$'){
+        char* variableName = cmds[1];
+        variable = getenv(&variableName[1]);
+      }
       if(variable != NULL){
         int i = 0;
         while(strcmp(&variable[i],"\0")){
@@ -174,6 +190,9 @@ main (int argc, char ** argv, char **envp) {
         }
       write(1, "\n", 1);
 
+      char returnCodeString[4];
+      sprintf(returnCodeString, "%d", 0);
+      setenv("?", returnCodeString, 1);
       debugEnd("echo", 0);
     } else if(!strcmp(cmdOne, setCompare)){
       /* set */
@@ -184,6 +203,9 @@ main (int argc, char ** argv, char **envp) {
         write(1, "Something went wrong.\n", 22);
       }
 
+      char returnCodeString[4];
+      sprintf(returnCodeString, "%d", returnCode);
+      setenv("?", returnCodeString, 1);
       debugEnd("set", returnCode);
     } else if (!strcmp(cmdOne, helpCompare)){
       /* help */
@@ -202,6 +224,9 @@ main (int argc, char ** argv, char **envp) {
       write(1, pwdString, strlen(pwdString));
       write(1, setString, strlen(setString));
 
+      char returnCodeString[4];
+      sprintf(returnCodeString, "%d", 0);
+      setenv("?", returnCodeString, 1);
       debugEnd("help", 0);
     } else {
       /* Non-built in commands */
@@ -304,6 +329,9 @@ main (int argc, char ** argv, char **envp) {
           //free(buffer);
           waitpid(childID, &childStatus, 0);
 
+          char returnCodeString[4];
+          sprintf(returnCodeString, "%d", childStatus);
+          setenv("?", returnCodeString, 1);
           debugEnd(bufferSize, childStatus);
         }
       } else {
