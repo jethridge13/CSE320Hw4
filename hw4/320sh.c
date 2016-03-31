@@ -176,53 +176,83 @@ main (int argc, char ** argv, char **envp) {
       write(1, pwdString, strlen(pwdString));
       write(1, setString, strlen(setString));
     } else {
-      /* TODO Implement control flow to test if given command exists */
       /* Non-built in commands */
-      char* paths[100];
-      char* path = getenv("PATH");
-
-      int pathsCount = 0;
-      int i;
-      for(i = 0; i < 100; i++) {
-        void* tokenptr;
-        if(i == 0)
-          tokenptr = strtok(path, ":");
-        else
-          tokenptr = strtok(NULL, ":");
-        if(tokenptr == NULL)
-          break;
-        paths[i] = tokenptr;
-        pathsCount++;
-      }
-      int pathFound = 0;
+      int customPath = 0;
       char* buffer;
-      for(i = 0; i < pathsCount; i++){
-        // buffer contains the full filepath to check
-        buffer = malloc(strlen(paths[i]) + strlen(cmdOne) + 1);
-        strcpy(buffer, paths[i]);
+      int pathFound = 0;
+      if(!strncmp(cmdOne, "/", 1)){
+        buffer = malloc(strlen(cmdOne));
+        strcpy(buffer, cmdOne);
+        struct stat pathBuffer;
+        if(stat (buffer, &pathBuffer) == 0){
+          customPath = 1;
+        }
+      } else if(!strncmp(cmdOne, "./", 2)) {
+        char cwd[PWD_BUFFER_SIZE];
+        memset(cwd, 0, PWD_BUFFER_SIZE);
+        getcwd(cwd, PWD_BUFFER_SIZE);
+        buffer = malloc(strlen(cmdOne) + PWD_BUFFER_SIZE) + 1;
+        strcpy(buffer, cwd);
         strcat(buffer, "/");
         strcat(buffer, cmdOne);
         struct stat pathBuffer;
         if(stat (buffer, &pathBuffer) == 0){
-          pathFound = 1;
-          break;
+          customPath = 1;
         }
-        free(buffer);
+      } else {
+        char* paths[100];
+        char* path = getenv("PATH");
+        int size = strlen(path);
+        char pathHolder[size];
+        strcpy(pathHolder, path);
+
+        int pathsCount = 0;
+        int i;
+        for(i = 0; i < 100; i++) {
+          void* tokenptr;
+          if(i == 0)
+            tokenptr = strtok(pathHolder, ":");
+          else
+            tokenptr = strtok(NULL, ":");
+          if(tokenptr == NULL)
+            break;
+          paths[i] = tokenptr;
+          pathsCount++;
+        }
+        char* loopBuffer;
+        for(i = 0; i < pathsCount; i++){
+          // buffer contains the full filepath to check
+          loopBuffer = malloc(strlen(paths[i]) + strlen(cmdOne) + 1);
+          strcpy(loopBuffer, paths[i]);
+          strcat(loopBuffer, "/");
+          strcat(loopBuffer, cmdOne);
+          struct stat pathBuffer;
+          if(stat (loopBuffer, &pathBuffer) == 0){
+            pathFound = 1;
+            buffer = malloc(sizeof(loopBuffer));
+            strcpy(buffer, loopBuffer);
+            free(loopBuffer);
+            break;
+          }
+          free(loopBuffer);
+        }
       }
-      if(pathFound){
+      if(pathFound || customPath){
         int child_status;
         pid_t childID = fork();
         if(childID == 0){
-          execv(buffer, cmds);
+          if (execv(buffer, cmds)){
+
+          }
         } else {
-          waitpid(childID, &child_status, 0);
           free(buffer);
+          waitpid(childID, &child_status, 0);
         }
       } else {
         /* Command does not exist */
         write(1, cmd, strnlen(cmd, MAX_INPUT));
         write(1, cmdDNE, strnlen(cmdDNE, MAX_INPUT));
-      } 
+      }
     }
 
     // Just echo the command line for now
