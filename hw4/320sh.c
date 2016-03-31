@@ -4,11 +4,20 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 // Assume no input line will be longer than 1024 bytes
 #define MAX_INPUT 1024
 
 #define PWD_BUFFER_SIZE 100
+
+#ifdef d
+  #define debugRun(cmd) fprintf(stderr, "RUNNING: %s\n", cmd)
+  #define debugEnd(cmd, return) fprintf(stderr, "ENDED: %s (ret=%d)\n", cmd, return)
+#else
+  #define debugRun(cmd)
+  #define debugEnd(cmd, return)
+#endif
 
 int 
 main (int argc, char ** argv, char **envp) {
@@ -30,7 +39,7 @@ main (int argc, char ** argv, char **envp) {
     int rv;
     int count;
     char* cmds[100]; //Placeholder check w josh
-    /* TODO Delete this */
+    /* TODO Delete this once this implementation strategy is changed */
     memset(cmds, 0, 100);
 
     // Print the working directory
@@ -104,6 +113,8 @@ main (int argc, char ** argv, char **envp) {
       exit(0);
     } else if(!strcmp(cmdOne, cdCompare)){
       /* cd */
+      debugRun("CD");
+
       int returnCode = 0;
 
       /* Temp will hold the current directory
@@ -125,15 +136,22 @@ main (int argc, char ** argv, char **envp) {
       if(returnCode){
         write(1, "Something went wrong.\n", 22);
       }
+      debugEnd("CD", returnCode);
     } else if(!strcmp(cmdOne, pwdCompare)){
       /* pwd */
+      debugRun("cd");
+
       char pwdBuffer[PWD_BUFFER_SIZE];
       memset(pwdBuffer, 0, PWD_BUFFER_SIZE);
       getcwd(pwdBuffer, PWD_BUFFER_SIZE);
       write(1, pwdBuffer, PWD_BUFFER_SIZE);
       write(1, "\n", 1);
+
+      debugEnd("pwd", 0);
     } else if(!strcmp(cmdOne, echoCompare)){
       /* echo */
+      debugRun("echo");
+
       char* variable = getenv(cmds[1]);
       if(variable != NULL){
         int i = 0;
@@ -155,14 +173,22 @@ main (int argc, char ** argv, char **envp) {
           }
         }
       write(1, "\n", 1);
+
+      debugEnd("echo", 0);
     } else if(!strcmp(cmdOne, setCompare)){
       /* set */
+      debugRun("set");
+
       int returnCode = setenv(cmds[1], cmds[3], 1);
       if(returnCode){
         write(1, "Something went wrong.\n", 22);
       }
+
+      debugEnd("set", returnCode);
     } else if (!strcmp(cmdOne, helpCompare)){
       /* help */
+      debugRun("help");
+
       char* cdString = "cd\t\tChange the current working directory.\n";
       char* echoString = "echo\t\tPrint strings and expand environment variables.\n";
       char* exitString = "exit\t\tExits the shell.\n";
@@ -175,29 +201,36 @@ main (int argc, char ** argv, char **envp) {
       write(1, helpString, strlen(helpString));
       write(1, pwdString, strlen(pwdString));
       write(1, setString, strlen(setString));
+
+      debugEnd("help", 0);
     } else {
       /* Non-built in commands */
       int customPath = 0;
       char* buffer;
       int pathFound = 0;
+      int bufferLength = 0;
       if(!strncmp(cmdOne, "/", 1)){
-        buffer = malloc(strlen(cmdOne));
-        strcpy(buffer, cmdOne);
+        char bufferSize[strlen(cmdOne)];
+        strcpy(bufferSize, cmdOne);
         struct stat pathBuffer;
-        if(stat (buffer, &pathBuffer) == 0){
+        if(stat (bufferSize, &pathBuffer) == 0){
+          buffer = bufferSize;
           customPath = 1;
+          bufferLength = strlen(bufferSize);
         }
       } else if(!strncmp(cmdOne, "./", 2)) {
         char cwd[PWD_BUFFER_SIZE];
         memset(cwd, 0, PWD_BUFFER_SIZE);
         getcwd(cwd, PWD_BUFFER_SIZE);
-        buffer = malloc(strlen(cmdOne) + PWD_BUFFER_SIZE) + 1;
-        strcpy(buffer, cwd);
-        strcat(buffer, "/");
-        strcat(buffer, cmdOne);
+        char bufferSize[strlen(cmdOne) + PWD_BUFFER_SIZE + 1];
+        strcpy(bufferSize, cwd);
+        strcat(bufferSize, "/");
+        strcat(bufferSize, cmdOne);
         struct stat pathBuffer;
-        if(stat (buffer, &pathBuffer) == 0){
+        if(stat (bufferSize, &pathBuffer) == 0){
           customPath = 1;
+          buffer = bufferSize;
+          bufferLength = strlen(bufferSize);
         }
       } else {
         char* paths[100];
@@ -229,8 +262,10 @@ main (int argc, char ** argv, char **envp) {
           struct stat pathBuffer;
           if(stat (loopBuffer, &pathBuffer) == 0){
             pathFound = 1;
-            buffer = malloc(sizeof(loopBuffer));
-            strcpy(buffer, loopBuffer);
+            char bufferSize[sizeof(loopBuffer)];
+            strcpy(bufferSize, loopBuffer);
+            buffer = bufferSize;
+            bufferLength = strlen(bufferSize);
             free(loopBuffer);
             break;
           }
@@ -238,15 +273,38 @@ main (int argc, char ** argv, char **envp) {
         }
       }
       if(pathFound || customPath){
-        int child_status;
+        int childStatus;
+        char bufferSize[bufferLength];
+        strcpy(&bufferSize[0], buffer);
+
+        debugRun(bufferSize);
+
         pid_t childID = fork();
         if(childID == 0){
-          if (execv(buffer, cmds)){
-
+          /*
+          write(1, bufferSize, strlen(bufferSize));
+          write(1, "\n", 1);
+          */
+          int status = execv(bufferSize, cmds);
+          if(status){
+            /* error handling that I used for debugging 
+            int errnum;
+            errnum = errno;
+            fprintf(stderr, "ERROR: %s\n", strerror(errnum));
+            */
+            char* statusLine = "Something with the execution of: '";
+            char* statusLine2 = "' failed.\n";
+            write(1, statusLine, strlen(statusLine));
+            write(1, bufferSize, strlen(bufferSize));
+            write(1, statusLine2, strlen(statusLine2));
+            /* Something went wrong with execution. Kill child. */
+            kill(getpid(), SIGKILL);
           }
         } else {
-          free(buffer);
-          waitpid(childID, &child_status, 0);
+          //free(buffer);
+          waitpid(childID, &childStatus, 0);
+
+          debugEnd(bufferSize, childStatus);
         }
       } else {
         /* Command does not exist */
