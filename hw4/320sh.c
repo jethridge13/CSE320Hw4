@@ -36,6 +36,7 @@ main (int argc, char ** argv, char **envp) {
 
   cmdHist* cmdHistPtr = calloc(50, sizeof(cmdHist)*50);
   cmdHist* cmdHistHead = cmdHistPtr;
+  cmdHist* cmdHistTail = cmdHistPtr;
 
   int cmdHistSize = 0;
   int cmdIdx = 0;
@@ -71,6 +72,9 @@ main (int argc, char ** argv, char **envp) {
       finished = 1;
       break;
     }
+
+    cmdHist* currHist = cmdHistTail; //FOR UP AND DOWN ARROWS
+    write(1, "\e[s", 3); //SAVE CURSOR POSITION
     
     // read and parse the input
     for(rv = 1, count = 0, 
@@ -88,6 +92,59 @@ main (int argc, char ** argv, char **envp) {
       sprintf(testString, "%d", test);
       write(1, testString, strlen(testString));
       */
+      if(strcmp(cursor, "\e") == 0) {
+        rv = read(0, cursor, 1);
+        if(strcmp(cursor, "[") == 0) {
+          rv = read(0, cursor, 1);
+          if(strcmp(cursor, "A") == 0) { //UP ARROW
+            if(currHist != NULL) {
+              *cursor = 0;
+              cursor--;
+              write(1, "\e[u", 3);
+              write(1, "\e[K", 3);
+              strcpy(cmd, (*currHist).cmdPrint);
+              currHist = (*currHist).prev;
+              write(1, cmd, strcspn(cmd, "\n"));
+              continue;
+            }
+            else {
+              *cursor = 0;
+              cursor--;
+              continue;
+            }
+          }
+
+          else if(strcmp(cursor, "B") == 0) { //DOWN ARROW
+            if((*currHist).next != NULL) {
+              *cursor = 0;
+              cursor--;
+              write(1, "\e[u", 3);
+              write(1, "\e[K", 3);
+              currHist = (*currHist).next;
+              strcpy(cmd, (*currHist).cmdPrint);
+              write(1, cmd, strcspn(cmd, "\n"));
+              continue;
+            }
+            else if(cmdHistHead != NULL) {
+              *cursor = 0;
+              cursor--;
+              write(1, "\e[u", 3);
+              write(1, "\e[K", 3);
+              currHist = cmdHistHead;
+              strcpy(cmd, (*currHist).cmdPrint);
+              write(1, cmd, strcspn(cmd, "\n"));
+              continue;
+            }
+            else {
+              *cursor = 0;
+              cursor--;
+              continue;
+            }
+          }
+          
+        }
+      }
+
       if(strcmp(cursor, "\b") == 119){
         /* Backspace detected */
         int i = 0;
@@ -113,7 +170,8 @@ main (int argc, char ** argv, char **envp) {
         strncpy(cmdPrint, cmd, cmdLen);
         write(1, cmdPrint, cmdLen);
         write(1, cursorMove, strlen(cursorMove));
-      } else {
+      }
+      else {
         write(1, cursor, 1);
       }
       
@@ -131,17 +189,16 @@ main (int argc, char ** argv, char **envp) {
     if(strcmp(cmd, "\n")) {
       if(cmdHistSize == 0) {
         strcpy((*cmdHistHead).cmdPrint, cmd); //INITIALIZE COMMAND HISTORY LIST
+        cmdHistTail = cmdHistHead;
         cmdHistSize++;
         cmdIdx++;
       }
       else {
         if(cmdHistSize < 50) {
           strcpy(cmdHistPtr[cmdIdx].cmdPrint, cmd);
-          cmdHist* currCmd = cmdHistHead;
-          while((*currCmd).next != NULL)
-            currCmd = (*currCmd).next;
-          (*currCmd).next = &(cmdHistPtr[cmdIdx]);
-          cmdHistPtr[cmdIdx].prev = currCmd;
+          (*cmdHistTail).next = &(cmdHistPtr[cmdIdx]);
+          cmdHistPtr[cmdIdx].prev = cmdHistTail;
+          cmdHistTail = &cmdHistPtr[cmdIdx];
           cmdHistSize++;
           cmdIdx++;
         }
@@ -151,12 +208,10 @@ main (int argc, char ** argv, char **envp) {
           cmdHistHead = (*cmdHistHead).next;
           (*cmdHistHead).prev = NULL; 
           strcpy(cmdHistPtr[cmdIdx].cmdPrint, cmd);
-          cmdHist* currCmd = cmdHistHead;
-          while((*currCmd).next != NULL)
-            currCmd = (*currCmd).next;
-          (*currCmd).next = &(cmdHistPtr[cmdIdx]);
-          cmdHistPtr[cmdIdx].prev = currCmd;
-          cmdHistPtr[cmdIdx].next = NULL;
+          (*cmdHistTail).next = &(cmdHistPtr[cmdIdx]);
+          cmdHistPtr[cmdIdx].prev = cmdHistTail;
+          cmdHistTail = &cmdHistPtr[cmdIdx];
+          (*cmdHistTail).next = NULL;
           cmdIdx++;
         }
       }
@@ -433,8 +488,4 @@ main (int argc, char ** argv, char **envp) {
   }
   free(cmdHistPtr);
   return 0;
-}
-
-void upArrow() { //Josh why did you write everything in main you're bustin my balls
-  
 }
