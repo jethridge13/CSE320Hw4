@@ -166,10 +166,15 @@ main (int argc, char ** argv, char **envp) {
         int cmdLen = strlen(cmd);
         cmdLen += -1;
         cmd[cmdLen] = '\0';
+        cmd[cmdLen - 1] = '\0';
         char cmdPrint[MAX_INPUT];
         strncpy(cmdPrint, cmd, cmdLen);
         write(1, cmdPrint, cmdLen);
         write(1, cursorMove, strlen(cursorMove));
+        *cursor = 0;
+        cursor--;
+        *cursor = 0;
+        cursor--;
       }
       else {
         write(1, cursor, 1);
