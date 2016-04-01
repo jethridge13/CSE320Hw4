@@ -25,6 +25,7 @@ main (int argc, char ** argv, char **envp) {
   int finished = 0;
   char *prompt = "320sh> ";
   char cmd[MAX_INPUT];
+  memset(cmd, 0, MAX_INPUT);
 
   struct cmdHist { //COMMAND HISTORY LIST
     char cmdPrint[MAX_INPUT];
@@ -89,14 +90,29 @@ main (int argc, char ** argv, char **envp) {
       */
       if(strcmp(cursor, "\b") == 119){
         /* Backspace detected */
+        int i = 0;
+        int endCase = strlen(cwd) + 3 + strlen(prompt) + strlen(cmd) + 1;
+        char clear[endCase];
+        for(;i < endCase; i++){
+          clear[i] = ' ';
+        }
+
         char *cr = "\r";
+        char *cursorMove = "\033[1D";
+        write(1, cr, strlen(cr));
+        write(1, clear, strlen(clear));
         write(1, cr, strlen(cr));
         write(1, "[", 1);
         write(1, cwd, PWD_BUFFER_SIZE);
         write(1, "] ", 2);
         write(1, prompt, strlen(prompt));
         int cmdLen = strlen(cmd);
-        write(1, cmd, cmdLen);
+        cmdLen += -1;
+        cmd[cmdLen] = '\0';
+        char cmdPrint[MAX_INPUT];
+        strncpy(cmdPrint, cmd, cmdLen);
+        write(1, cmdPrint, cmdLen);
+        write(1, cursorMove, strlen(cursorMove));
       } else {
         write(1, cursor, 1);
       }
