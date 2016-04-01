@@ -33,8 +33,11 @@ main (int argc, char ** argv, char **envp) {
   };
   typedef struct cmdHist cmdHist;
 
+  cmdHist* cmdHistPtr = calloc(50, sizeof(cmdHist)*50);
+  cmdHist* cmdHistHead = cmdHistPtr;
+
   int cmdHistSize = 0;
-  cmdHist cmdHistHead;
+  int cmdIdx = 0;
 
   char* cmdDNE = ": command not found\n";
 
@@ -90,34 +93,34 @@ main (int argc, char ** argv, char **envp) {
     /*COMMAND LIST HISTORY*/
     if(strcmp(cmd, "\n")) {
       if(cmdHistSize == 0) {
-        strcpy(cmdHistHead.cmdPrint, cmd); //INITIALIZE COMMAND HISTORY LIST
-        cmdHistHead.next = NULL;
-        cmdHistHead.prev = NULL;
+        strcpy((*cmdHistHead).cmdPrint, cmd); //INITIALIZE COMMAND HISTORY LIST
         cmdHistSize++;
+        cmdIdx++;
       }
       else {
         if(cmdHistSize < 50) {
-          cmdHist newCmd;
-          strcpy(newCmd.cmdPrint, cmd);
-          newCmd.next = NULL;
-          cmdHist* currCmd = &cmdHistHead;
+          strcpy(cmdHistPtr[cmdIdx].cmdPrint, cmd);
+          cmdHist* currCmd = cmdHistHead;
           while((*currCmd).next != NULL)
             currCmd = (*currCmd).next;
-          (*currCmd).next = &newCmd;
-          newCmd.prev = currCmd;
+          (*currCmd).next = &(cmdHistPtr[cmdIdx]);
+          cmdHistPtr[cmdIdx].prev = currCmd;
           cmdHistSize++;
+          cmdIdx++;
         }
         else {
-          cmdHistHead = *(cmdHistHead.next);
-          cmdHistHead.prev = NULL;
-          cmdHist newCmd;
-          strcpy(newCmd.cmdPrint, cmd);
-          newCmd.next = NULL;
-          cmdHist* currCmd = &cmdHistHead;
+          if(cmdIdx >= 50)
+            cmdIdx = 0;
+          cmdHistHead = (*cmdHistHead).next;
+          (*cmdHistHead).prev = NULL; 
+          strcpy(cmdHistPtr[cmdIdx].cmdPrint, cmd);
+          cmdHist* currCmd = cmdHistHead;
           while((*currCmd).next != NULL)
             currCmd = (*currCmd).next;
-          (*currCmd).next = &newCmd;
-          newCmd.prev = currCmd;
+          (*currCmd).next = &(cmdHistPtr[cmdIdx]);
+          cmdHistPtr[cmdIdx].prev = currCmd;
+          cmdHistPtr[cmdIdx].next = NULL;
+          cmdIdx++;
         }
       }
     }
@@ -339,7 +342,8 @@ main (int argc, char ** argv, char **envp) {
             free(loopBuffer);
             break;
           }
-          free(loopBuffer);
+          else
+            free(loopBuffer);
         }
       }
       if(pathFound || customPath){
@@ -390,7 +394,7 @@ main (int argc, char ** argv, char **envp) {
     //write(1, cmd, strnlen(cmd, MAX_INPUT));
 
   }
-
+  free(cmdHistPtr);
   return 0;
 }
 
