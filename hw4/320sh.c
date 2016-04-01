@@ -26,6 +26,16 @@ main (int argc, char ** argv, char **envp) {
   char *prompt = "320sh> ";
   char cmd[MAX_INPUT];
 
+  struct cmdHist { //COMMAND HISTORY LIST
+    char cmdPrint[MAX_INPUT];
+    struct cmdHist *next;
+    struct cmdHist *prev;
+  };
+  typedef struct cmdHist cmdHist;
+
+  int cmdHistSize = 0;
+  cmdHist cmdHistHead;
+
   char* cmdDNE = ": command not found\n";
 
   char previousWD[PWD_BUFFER_SIZE];
@@ -76,6 +86,41 @@ main (int argc, char ** argv, char **envp) {
       }
     } 
     *cursor = '\0';
+
+    /*COMMAND LIST HISTORY*/
+    if(strcmp(cmd, "\n")) {
+      if(cmdHistSize == 0) {
+        strcpy(cmdHistHead.cmdPrint, cmd); //INITIALIZE COMMAND HISTORY LIST
+        cmdHistHead.next = NULL;
+        cmdHistHead.prev = NULL;
+        cmdHistSize++;
+      }
+      else {
+        if(cmdHistSize < 50) {
+          cmdHist newCmd;
+          strcpy(newCmd.cmdPrint, cmd);
+          newCmd.next = NULL;
+          cmdHist* currCmd = &cmdHistHead;
+          while((*currCmd).next != NULL)
+            currCmd = (*currCmd).next;
+          (*currCmd).next = &newCmd;
+          newCmd.prev = currCmd;
+          cmdHistSize++;
+        }
+        else {
+          cmdHistHead = *(cmdHistHead.next);
+          cmdHistHead.prev = NULL;
+          cmdHist newCmd;
+          strcpy(newCmd.cmdPrint, cmd);
+          newCmd.next = NULL;
+          cmdHist* currCmd = &cmdHistHead;
+          while((*currCmd).next != NULL)
+            currCmd = (*currCmd).next;
+          (*currCmd).next = &newCmd;
+          newCmd.prev = currCmd;
+        }
+      }
+    }
 
     //PARSING STARTS HERE | STORES TOKENS INTO ARRAY OF POINTERS
     for(int i = 0; i < 100; i++) {
@@ -347,4 +392,8 @@ main (int argc, char ** argv, char **envp) {
   }
 
   return 0;
+}
+
+void upArrow() { //Josh why did you write everything in main you're bustin my balls
+  
 }
