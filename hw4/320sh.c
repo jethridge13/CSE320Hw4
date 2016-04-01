@@ -80,6 +80,27 @@ main (int argc, char ** argv, char **envp) {
 	cursor++) { 
 
       rv = read(0, cursor, 1);
+
+      /* Debug stuff
+      int test = strcmp(cursor, "\b");
+      char testString[4];
+      sprintf(testString, "%d", test);
+      write(1, testString, strlen(testString));
+      */
+      if(strcmp(cursor, "\b") == 119){
+        /* Backspace detected */
+        char *cr = "\r";
+        write(1, cr, strlen(cr));
+        write(1, "[", 1);
+        write(1, cwd, PWD_BUFFER_SIZE);
+        write(1, "] ", 2);
+        write(1, prompt, strlen(prompt));
+        int cmdLen = strlen(cmd);
+        write(1, cmd, cmdLen);
+      } else {
+        write(1, cursor, 1);
+      }
+      
       last_char = *cursor;
       if(last_char == 3) {
         write(1, "^c", 2);
@@ -341,9 +362,9 @@ main (int argc, char ** argv, char **envp) {
             bufferLength = strlen(bufferSize);
             free(loopBuffer);
             break;
-          }
-          else
+          } else {
             free(loopBuffer);
+          }
         }
       }
       if(pathFound || customPath){
