@@ -422,10 +422,11 @@ main (int argc, char ** argv, char **envp) {
           paths[i] = tokenptr;
           pathsCount++;
         }
-        char* loopBuffer;
+        int loopBufferSize = strlen(path) + strlen(cmdOne);
+        char* loopBuffer = malloc(loopBufferSize);
         for(i = 0; i < pathsCount; i++){
           // buffer contains the full filepath to check
-          loopBuffer = malloc(strlen(paths[i]) + strlen(cmdOne) + 1);
+          memset(loopBuffer, 0, loopBufferSize);
           strcpy(loopBuffer, paths[i]);
           strcat(loopBuffer, "/");
           strcat(loopBuffer, cmdOne);
@@ -436,12 +437,9 @@ main (int argc, char ** argv, char **envp) {
             strcpy(bufferSize, loopBuffer);
             buffer = bufferSize;
             bufferLength = strlen(bufferSize);
-            free(loopBuffer);
             break;
-          } else {
-            free(loopBuffer);
-          }
         }
+        free(loopBuffer);
       }
       if(pathFound || customPath){
         int childStatus;
