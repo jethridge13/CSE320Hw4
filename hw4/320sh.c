@@ -73,7 +73,7 @@ main (int argc, char ** argv, char **envp) {
       break;
     }
 
-    cmdHist* currHist = cmdHistTail; //FOR UP AND DOWN ARROWS
+    cmdHist* currHist = NULL; //FOR UP AND DOWN ARROWS
     write(1, "\e[s", 3); //SAVE CURSOR POSITION
     
     // read and parse the input
@@ -97,13 +97,23 @@ main (int argc, char ** argv, char **envp) {
         if(strcmp(cursor, "[") == 0) {
           rv = read(0, cursor, 1);
           if(strcmp(cursor, "A") == 0) { //UP ARROW
-            if(currHist != NULL) {
+            if(currHist == NULL && cmdHistTail != NULL) {
               *cursor = 0;
               cursor--;
               write(1, "\e[u", 3);
               write(1, "\e[K", 3);
+              currHist = cmdHistTail;
               strcpy(cmd, (*currHist).cmdPrint);
+              write(1, cmd, strcspn(cmd, "\n"));
+              continue;
+            }
+            else if(currHist != NULL && (*currHist).prev != NULL) {
+              *cursor = 0;
+              cursor--;
+              write(1, "\e[u", 3);
+              write(1, "\e[K", 3);
               currHist = (*currHist).prev;
+              strcpy(cmd, (*currHist).cmdPrint);
               write(1, cmd, strcspn(cmd, "\n"));
               continue;
             }
@@ -125,16 +135,6 @@ main (int argc, char ** argv, char **envp) {
               write(1, cmd, strcspn(cmd, "\n"));
               continue;
             }
-            else if(cmdHistHead != NULL) {
-              *cursor = 0;
-              cursor--;
-              write(1, "\e[u", 3);
-              write(1, "\e[K", 3);
-              currHist = cmdHistHead;
-              strcpy(cmd, (*currHist).cmdPrint);
-              write(1, cmd, strcspn(cmd, "\n"));
-              continue;
-            }
             else {
               *cursor = 0;
               cursor--;
@@ -142,6 +142,12 @@ main (int argc, char ** argv, char **envp) {
             }
           }
           
+          else if(strcmp(cursor, "C") == 0) { //LEFT ARROW
+
+          }
+
+          else if(strcmp(cursor, "D") == 0) { //RIGHT ARROW
+          }
         }
       }
 
