@@ -438,6 +438,7 @@ main (int argc, char ** argv, char **envp) {
             buffer = bufferSize;
             bufferLength = strlen(bufferSize);
             break;
+          } 
         }
         free(loopBuffer);
       }
