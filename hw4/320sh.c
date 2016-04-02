@@ -42,11 +42,18 @@ main (int argc, char ** argv, char **envp) {
   int cmdHistSize = 0;
   int cmdIdx = 0;
 
-  FILE* historylist = fopen("320sh_history", "a+");
+  char* homeVariable = getenv("HOME");
+  char* shHistory = "320sh_history";
+  char homeVariablePath[strlen(homeVariable) + strlen(shHistory) + 1];
+  strcpy(homeVariablePath, homeVariable);
+  strcat(homeVariablePath, "/");
+  strcat(homeVariablePath, shHistory);
+
+  FILE* historylist = fopen(homeVariablePath, "a+");
   if (historylist != NULL) //CREATE IF DOESN'T EXIST
     fclose (historylist);
 
-  historylist = fopen("320sh_history", "r");
+  historylist = fopen(homeVariablePath, "r");
   if (historylist != NULL)
   {
     char cmdRead[MAX_INPUT];
@@ -313,7 +320,7 @@ main (int argc, char ** argv, char **envp) {
             It works because else statements. */
       }else if(!strcmp(cmdOne, exitCompare)){
         /* exit */
-        historylist = fopen("320sh_history", "w");
+        historylist = fopen(homeVariablePath, "w");
         char sizeStr[2];
         sprintf(sizeStr, "%i", cmdHistSize - 1);
         if (historylist != NULL)
