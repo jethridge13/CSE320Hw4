@@ -42,6 +42,42 @@ main (int argc, char ** argv, char **envp) {
   int cmdHistSize = 0;
   int cmdIdx = 0;
 
+  char* homeVariable = getenv("HOME");
+  char* shHistory = "320sh_history";
+  char homeVariablePath[strlen(homeVariable) + strlen(shHistory) + 1];
+  strcpy(homeVariablePath, homeVariable);
+  strcat(homeVariablePath, "/");
+  strcat(homeVariablePath, shHistory);
+
+  FILE* historylist = fopen(homeVariablePath, "a+");
+  if (historylist != NULL) //CREATE IF DOESN'T EXIST
+    fclose (historylist);
+
+  historylist = fopen(homeVariablePath, "r");
+  if (historylist != NULL)
+  {
+    char cmdRead[MAX_INPUT];
+    if(fgets(cmdRead, MAX_INPUT, historylist) != NULL) {
+      cmdHistSize = atoi(cmdRead);
+    }
+    if(fgets(cmdRead, MAX_INPUT, historylist) != NULL) {
+      strcat(cmdRead, "\n");
+      strcpy((*cmdHistHead).cmdPrint, cmdRead);
+      cmdIdx++;
+    }
+    while(fgets(cmdRead, MAX_INPUT, historylist) != NULL) {
+      strcat(cmdRead, "\n");
+      cmdIdx++;
+      strcpy(cmdHistPtr[cmdIdx].cmdPrint, cmdRead);
+      (*cmdHistTail).next = &cmdHistPtr[cmdIdx];
+      cmdHistPtr[cmdIdx].prev = cmdHistTail;
+      cmdHistTail = &cmdHistPtr[cmdIdx];
+      if(cmdIdx > 50)
+        cmdIdx = 0;
+    }
+    fclose (historylist);
+  }
+
   char* cmdDNE = ": command not found\n";
 
   char previousWD[PWD_BUFFER_SIZE];
@@ -76,7 +112,7 @@ main (int argc, char ** argv, char **envp) {
       break;
     }
 
-    cmdHist* currHist = cmdHistTail; //FOR UP AND DOWN ARROWS
+    cmdHist* currHist = NULL; //FOR UP AND DOWN ARROWS
     write(1, "\e[s", 3); //SAVE CURSOR POSITION
     
     // read and parse the input
@@ -100,13 +136,23 @@ main (int argc, char ** argv, char **envp) {
         if(strcmp(cursor, "[") == 0) {
           rv = read(0, cursor, 1);
           if(strcmp(cursor, "A") == 0) { //UP ARROW
-            if(currHist != NULL) {
+            if(currHist == NULL && cmdHistTail != NULL) {
               *cursor = 0;
               cursor--;
               write(1, "\e[u", 3);
               write(1, "\e[K", 3);
+              currHist = cmdHistTail;
               strcpy(cmd, (*currHist).cmdPrint);
+              write(1, cmd, strcspn(cmd, "\n"));
+              continue;
+            }
+            else if(currHist != NULL && (*currHist).prev != NULL) {
+              *cursor = 0;
+              cursor--;
+              write(1, "\e[u", 3);
+              write(1, "\e[K", 3);
               currHist = (*currHist).prev;
+              strcpy(cmd, (*currHist).cmdPrint);
               write(1, cmd, strcspn(cmd, "\n"));
               continue;
             }
@@ -128,16 +174,6 @@ main (int argc, char ** argv, char **envp) {
               write(1, cmd, strcspn(cmd, "\n"));
               continue;
             }
-            else if(cmdHistHead != NULL) {
-              *cursor = 0;
-              cursor--;
-              write(1, "\e[u", 3);
-              write(1, "\e[K", 3);
-              currHist = cmdHistHead;
-              strcpy(cmd, (*currHist).cmdPrint);
-              write(1, cmd, strcspn(cmd, "\n"));
-              continue;
-            }
             else {
               *cursor = 0;
               cursor--;
@@ -145,6 +181,18 @@ main (int argc, char ** argv, char **envp) {
             }
           }
           
+          else if(strcmp(cursor, "C") == 0 && cursor - cmd > 0) { //RIGHT ARROW
+              *cursor = 0;
+              cursor--;
+              cursor--;
+              continue;
+          }
+
+          else if(strcmp(cursor, "D") == 0 && cursor - cmd > 0) { //RIGHT ARROW
+              *cursor = 0;
+              cursor--;
+              continue;
+          }
         }
       }
 
@@ -272,6 +320,23 @@ main (int argc, char ** argv, char **envp) {
             It works because else statements. */
       }else if(!strcmp(cmdOne, exitCompare)){
         /* exit */
+        historylist = fopen(homeVariablePath, "w");
+        char sizeStr[2];
+        sprintf(sizeStr, "%i", cmdHistSize - 1);
+        if (historylist != NULL)
+        {
+          fputs(sizeStr, historylist);
+          fputs("\n", historylist);
+          cmdHist* writeHistPtr = cmdHistHead;
+          while(writeHistPtr != NULL) {
+            if(strcmp((*writeHistPtr).cmdPrint, "exit\n") == 0)
+              break;
+            fputs((*writeHistPtr).cmdPrint, historylist);
+            writeHistPtr = (*writeHistPtr).next;
+          }
+          fclose (historylist);
+        }
+        free(cmdHistPtr);
         exit(0);
       } else if(!strcmp(cmdOne, cdCompare)){
         /* cd */
@@ -505,7 +570,6 @@ main (int argc, char ** argv, char **envp) {
         strcpy(cmd, pipingCmds[i+1]);
       } 
     }
-  }
-  free(cmdHistPtr);
+  };
   return 0;
 }
