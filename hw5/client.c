@@ -52,6 +52,36 @@ int main(int argc, char** argv){
     	printf("SERVER_IP: %s\n", serverIP);
     	printf("SERVER_PORT: %s\n", serverPort);
     }
+
+    char input[100]; //CLIENT IO COMMANDS
+    printf("> ");
+    while(fgets(input, 100, stdin)){
+        if(*input == '/') {
+            if(!strcmp(input, "/time\n")) {
+
+            }
+            else if(!strcmp(input, "/help\n")) {
+                printf(
+                    "CLIENT COMMANDS:\n"
+                    "/time          Displays how long the client has been connected to server.\n"
+                    "/help          Lists all client commands. The thing you just typed in.\n"
+                    "/logout        Disconnects client from server.\n"
+                    "/listu         Lists all clients connected to server.\n");
+            }
+            else if(!strcmp(input, "/logout\n")) {
+                exit(EXIT_SUCCESS);
+            }
+            else if(!strcmp(input, "/listu\n")) {
+                
+            }
+            else
+                printf("%s\n", "Invalid command. Enter /help for a list of commands.");
+        }
+        else {
+            printf("%s", input);
+        }
+    printf("> ");
+    }
 }
 
 void usage(){

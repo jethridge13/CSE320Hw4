@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 
 #include "csapp.h"
-#include <libexplain/bind.h>
+//#include <libexplain/bind.h>
 
 #define NORMAL_TEXT "\x1B[0m"
 #define ERROR_TEXT "\x1B[1;31m"
