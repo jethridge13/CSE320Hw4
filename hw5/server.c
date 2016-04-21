@@ -12,15 +12,16 @@
 void help();
 void users();
 int sd();
+int echo(int connfd);
 void usage();
 
 int main(int argc, char **argv) {
-	int opt;
+	int opt, /*childrenLogin = 0, */ port, argumentsPassed = 0;
+	int connfd;
+	int clientlen;
 	bool verbose = false;
-	int argumentsPassed = 0;
 	char* portNumber = NULL;
 	char* motd = NULL;
-	int port;
 	while((opt = getopt(argc, argv, "hv")) != -1) {
         switch(opt) {
             case 'h':
@@ -63,26 +64,30 @@ int main(int argc, char **argv) {
 	}
 
 	int listenfd;
-	int optval = 1;
 	struct sockaddr_in serveraddr;
+	struct sockaddr_in clientaddr;
+	struct hostent *hostp;
+	char *hostaddrp;
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
-	if(listenfd == -1){
+	if(listenfd < 0){
 		printf("%sError creating socket.\n", ERROR_TEXT);
 		return EXIT_FAILURE;
 	}
 
-	bzero((char *) &serveraddr, sizeof(serveraddr));
-	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr = INADDR_ANY;
-	serveraddr.sin_port = port; 
+	int optval = 1;
 
 	if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, 
 		(const void *)&optval , sizeof(int)) < 0) { 
 		return EXIT_FAILURE;
 	}
 
-	int ret = bind(listenfd, &serveraddr, sizeof(serveraddr));
+	bzero((char *) &serveraddr, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;	/* Use the internet */
+	serveraddr.sin_addr.s_addr = INADDR_ANY;
+	serveraddr.sin_port = htons((unsigned short) port); /* Listen on this port */
+
+	int ret = bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
 	if(ret < 0){
 		printf("%sError binding. Returned: %d\n", ERROR_TEXT, ret);
 		return EXIT_FAILURE;
@@ -95,28 +100,71 @@ int main(int argc, char **argv) {
 	}
 	//printf("%d\n", listenfd);
 
+	clientlen = sizeof(clientaddr);
+
 	printf("%sCurrently listening on port %d.\n", NORMAL_TEXT, port);
+
+
 
 	int selectRet = 0;
 	int stdinReady = 0;
 	int connectReady = 0;
 	fd_set fdRead;
 	char cmd[MAX_LINE];
+	clientlen = sizeof(struct sockaddr_storage);
+
 	while(true){
 		FD_ZERO(&fdRead);
-		FD_SET(fileno(stdin), &fdRead);
+		//FD_SET(fileno(stdin), &fdRead);
 		FD_SET(listenfd, &fdRead);
 
 		selectRet = select(listenfd + 1, &fdRead, NULL, NULL, NULL);
 
+		if(selectRet < 0){
+			/* Something went wrong! */
+		}
+
 		stdinReady = FD_ISSET(fileno(stdin), &fdRead);
 		connectReady = FD_ISSET(listenfd, &fdRead);
 
+		connectReady = 1;
+
+		/* Handle connection */
 		if(connectReady){
-			printf("selectRet: %d\n", selectRet);
-			printf("FD_ISSET(listenfd): %d\n", connectReady);
+			if(verbose){
+				printf("%sSpawning login thread.\n", VERBOSE_TEXT);
+			}
+			/*
+			pid_t childID = fork();
+			if(childID){
+				childrenLogin++;
+			} else {
+
+			}
+			*/
+			connfd = accept(listenfd, (SA *)&clientaddr, (socklen_t*)&clientlen);
+			if(connfd < 0){
+				printf("%sError on accept.\n", ERROR_TEXT);
+			}
+			
+			hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
+				sizeof(clientaddr.sin_addr.s_addr), AF_INET);
+			if(hostp == NULL){
+
+			}
+			hostaddrp = inet_ntoa(clientaddr.sin_addr);
+			if(hostaddrp == NULL){
+
+			}
+			if(verbose){
+				printf("%sServer established connection with %s (%s)\n",
+					VERBOSE_TEXT, hostp->h_name, hostaddrp);
+			}
+
+			echo(connfd);
 		}
 
+		/* Handle STDIN */
 		if(stdinReady){
 			printf("%s%s", NORMAL_TEXT, CURSOR);
 			fgets(cmd, MAX_LINE, stdin);
@@ -135,6 +183,22 @@ int main(int argc, char **argv) {
 		selectRet = 0;
 		stdinReady = 0;
 		connectReady = 0;
+	}
+}
+
+int echo(int connfd){
+	char buf[MAX_LINE];
+	bzero(buf, MAX_LINE);
+	int n;
+	while(true){
+		n = read(connfd, buf, MAX_LINE);
+		if (n < 0){
+			return EXIT_FAILURE;
+		}
+		n = write(connfd, buf, strlen(buf));
+		if(n < 0){
+			return EXIT_FAILURE;
+		}
 	}
 }
 
