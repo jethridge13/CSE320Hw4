@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
 
 	while(true){
 		FD_ZERO(&fdRead);
-		//FD_SET(fileno(stdin), &fdRead);
+		FD_SET(fileno(stdin), &fdRead);
 		FD_SET(listenfd, &fdRead);
 
 		selectRet = select(listenfd + 1, &fdRead, NULL, NULL, NULL);
@@ -126,9 +126,6 @@ int main(int argc, char **argv) {
 
 		stdinReady = FD_ISSET(fileno(stdin), &fdRead);
 		connectReady = FD_ISSET(listenfd, &fdRead);
-
-		connectReady = 1;
-
 		/* Handle connection */
 		if(connectReady){
 			if(verbose){
@@ -161,7 +158,14 @@ int main(int argc, char **argv) {
 					VERBOSE_TEXT, hostp->h_name, hostaddrp);
 			}
 
-			echo(connfd);
+			int echoRet = echo(connfd);
+			if(!echoRet){
+				printf("%sError with echo.\n", ERROR_TEXT);
+				close(connfd);
+				return EXIT_FAILURE;
+			} else {
+				close(connfd);
+			}
 		}
 
 		/* Handle STDIN */
@@ -189,17 +193,9 @@ int main(int argc, char **argv) {
 int echo(int connfd){
 	char buf[MAX_LINE];
 	bzero(buf, MAX_LINE);
-	int n;
-	while(true){
-		n = read(connfd, buf, MAX_LINE);
-		if (n < 0){
-			return EXIT_FAILURE;
-		}
-		n = write(connfd, buf, strlen(buf));
-		if(n < 0){
-			return EXIT_FAILURE;
-		}
-	}
+	read(connfd, buf, MAX_LINE);
+	write(connfd, buf, strlen(buf));
+	return EXIT_SUCCESS;
 }
 
 void users(){
