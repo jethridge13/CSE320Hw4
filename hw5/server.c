@@ -7,6 +7,9 @@
 #define VERBOSE_TEXT "\x1B[1;34m"
 #define MAX_LINE 1024
 #define CURSOR "DFIServer> "
+#define ENDVERB "\r\n\r\n"
+#define WOLFIE "WOLFIE "
+#define IAM "IAM "
 
 void help();
 void users();
@@ -14,11 +17,12 @@ int sd();
 void *login(void *connfd);
 void usage();
 
+bool verbose = false;
+
 int main(int argc, char **argv) {
 	int opt, /*childrenLogin = 0, */ port, argumentsPassed = 0;
 	int connfd;
 	int clientlen;
-	bool verbose = false;
 	char* portNumber = NULL;
 	char* motd = NULL;
 	while((opt = getopt(argc, argv, "hv")) != -1) {
@@ -58,8 +62,8 @@ int main(int argc, char **argv) {
 
     /* TODO Remove this */
     if(verbose){
-    	printf("%sPORT_NUMBER: %d\n", VERBOSE_TEXT, port);
-    	printf("%sMOTD: %s\n", VERBOSE_TEXT, motd);
+    	printf("%sPORT_NUMBER: %d\n%s", VERBOSE_TEXT, port, NORMAL_TEXT);
+    	printf("%sMOTD: %s\n%s", VERBOSE_TEXT, motd, NORMAL_TEXT);
 	}
 
 	int listenfd;
@@ -129,7 +133,7 @@ int main(int argc, char **argv) {
 		/* Handle connection */
 		if(connectReady){
 			if(verbose){
-				printf("%sSpawning login thread.\n", VERBOSE_TEXT);
+				printf("%sSpawning login thread.\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 			/*
 			pid_t childID = fork();
@@ -154,7 +158,7 @@ int main(int argc, char **argv) {
 
 			}
 			printf("%sServer established connection with %s (%s)\n",
-				VERBOSE_TEXT, hostp->h_name, hostaddrp);
+				NORMAL_TEXT, hostp->h_name, hostaddrp);
 
 			pthread_create(&tid, NULL, login, &connfd);
 			pthread_setname_np(tid, "LOGIN");
@@ -182,13 +186,119 @@ int main(int argc, char **argv) {
 	}
 }
 
+/* The method to handle logging on */
+/* TODO Save users and fds */
 void *login(void *vargp){
+
 	int connfd = *((int*)vargp);
+	//pthread_t id = pthread_self();
+
 	char buf[MAX_LINE];
 	bzero(buf, MAX_LINE);
+
 	read(connfd, buf, MAX_LINE);
-	write(connfd, buf, strlen(buf));
+
+	char* cmd = strstr(buf, ENDVERB);
+	int charLeft = MAX_LINE;
+	bool verbFound = false;
+
+	/* This bracket will check for verbs for the length of
+	MAX_LINE. If MAX_LINE is exceeded and no verbs found, 
+	will write an error to the client and disconnect them. */
+	if(cmd == NULL){
+		while(charLeft > 0){
+			char buf2[charLeft];
+			read(connfd, buf2, charLeft);
+			strcpy(buf+strlen(buf), buf2);
+			/*
+			FILE *file;
+			file = fopen("test.txt", "wt");
+			fprintf(file, "%s", buf);
+			fclose(file);
+			*/
+			cmd = strstr(buf, ENDVERB);
+			if(cmd != NULL){
+				verbFound = true;
+				break;
+			}
+			charLeft = charLeft - strlen(buf);
+		}
+	} else {
+		verbFound = true;
+	}
+
+	/* Verb found. Should be WOLFIE, then IAM. */
+	if(verbFound){
+		cmd = strstr(buf, WOLFIE);
+		if(cmd != NULL){
+			if(verbose){
+				printf("%sWOLFIE recieved\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+			}
+			char connect[] = "EIFLOW \r\n\r\n";
+			write(connfd, connect, strlen(connect));
+			if(verbose){
+				printf("%sEIFLOW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+			}
+
+			bzero(buf, MAX_LINE);
+			read(connfd, buf, MAX_LINE);
+			cmd = strstr(buf, ENDVERB);
+			charLeft = MAX_LINE;
+			verbFound = false;
+			if(cmd == NULL){
+				while(charLeft > 0){
+					char buf2[charLeft];
+					read(connfd, buf2, charLeft);
+					strcpy(buf+strlen(buf), buf2);
+
+					cmd = strstr(buf, ENDVERB);
+					if(cmd != NULL){
+						verbFound = true;
+						break;
+					}
+					charLeft = charLeft - strlen(buf);
+				}
+			} else {
+				verbFound = true;
+			}
+			if(verbFound){
+				cmd = strstr(buf, IAM);
+				if(cmd != NULL){
+					if(verbose){
+						printf("%sIAM recieved\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+					}
+
+					/* TODO This does not yet extract the name,
+					but sends back HI */
+					char name[strlen(buf)];
+					memcpy(name, &buf[3], strlen(buf) - 2);
+					char hi[] = "HI ";
+
+					char hiSend[strlen(name) + strlen(hi)];
+					strcpy(hiSend, hi);
+					strcat(hiSend, name);
+
+					write(connfd, hiSend, strlen(hiSend));
+
+					if(verbose){
+						printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+					}
+				}
+			} else {
+				char error[] = "ERR 1 'Expected IAM.' \r\n\r\n";
+				write(connfd, error, strlen(error));
+			}
+		} else {
+			char error[] = "ERR 1 'Expected WOLFIE.' \r\n\r\n";
+			write(connfd, error, strlen(error));
+		}
+	} else {
+		char error[] = "ERR 1 'Verb not found.' \r\n\r\n";
+		write(connfd, error, strlen(error));
+	}
+
 	close(connfd);
+	pthread_exit(EXIT_SUCCESS);
 	return NULL;
 }
 
