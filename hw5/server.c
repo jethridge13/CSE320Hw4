@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 
 #include "csapp.h"
-//#include <libexplain/bind.h>
 
 #define NORMAL_TEXT "\x1B[0m"
 #define ERROR_TEXT "\x1B[1;31m"
@@ -12,7 +11,7 @@
 void help();
 void users();
 int sd();
-int echo(int connfd);
+void *login(void *connfd);
 void usage();
 
 int main(int argc, char **argv) {
@@ -112,6 +111,7 @@ int main(int argc, char **argv) {
 	fd_set fdRead;
 	char cmd[MAX_LINE];
 	clientlen = sizeof(struct sockaddr_storage);
+	pthread_t tid;
 
 	while(true){
 		FD_ZERO(&fdRead);
@@ -153,24 +153,16 @@ int main(int argc, char **argv) {
 			if(hostaddrp == NULL){
 
 			}
-			if(verbose){
-				printf("%sServer established connection with %s (%s)\n",
-					VERBOSE_TEXT, hostp->h_name, hostaddrp);
-			}
+			printf("%sServer established connection with %s (%s)\n",
+				VERBOSE_TEXT, hostp->h_name, hostaddrp);
 
-			int echoRet = echo(connfd);
-			if(!echoRet){
-				printf("%sError with echo.\n", ERROR_TEXT);
-				close(connfd);
-				return EXIT_FAILURE;
-			} else {
-				close(connfd);
-			}
+			pthread_create(&tid, NULL, login, &connfd);
+			pthread_setname_np(tid, "LOGIN");
 		}
 
 		/* Handle STDIN */
 		if(stdinReady){
-			printf("%s%s", NORMAL_TEXT, CURSOR);
+			//printf("%s%s", NORMAL_TEXT, CURSOR);
 			fgets(cmd, MAX_LINE, stdin);
 			strtok(cmd, "\n");
 			if(!strcmp(cmd, "/help")){
@@ -190,12 +182,14 @@ int main(int argc, char **argv) {
 	}
 }
 
-int echo(int connfd){
+void *login(void *vargp){
+	int connfd = *((int*)vargp);
 	char buf[MAX_LINE];
 	bzero(buf, MAX_LINE);
 	read(connfd, buf, MAX_LINE);
 	write(connfd, buf, strlen(buf));
-	return EXIT_SUCCESS;
+	close(connfd);
+	return NULL;
 }
 
 void users(){

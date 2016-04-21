@@ -24,6 +24,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 
 /* Default file permissions are DEF_MODE & ~DEF_UMASK */
