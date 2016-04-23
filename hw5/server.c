@@ -28,6 +28,7 @@ void testPrint(char* string);
 void testPrintInt(int i);
 
 /* TODO Replace bzero with memset */
+/* TODO Fix communication thread for when all users disconnect */
 
 bool verbose = false;
 
@@ -601,7 +602,12 @@ void* communicate(){
 					}
 				}
 			}
-		} 
+		}
+		if(!usersConnected){
+			FD_ZERO(&commfd);
+			commRun = false;
+			pthread_exit(EXIT_SUCCESS);
+		}
 	}
 	return NULL;
 }
