@@ -10,7 +10,12 @@
 #define ENDVERB "\r\n\r\n"
 #define WOLFIE "WOLFIE"
 #define IAM "IAM "
-#define BYE "BYE"
+#define BYE "BYE\r\n\r\n"
+#define BYE_NO_PRO "BYE"
+#define TIME "TIME"
+#define EMIT "EMIT "
+#define LISTU "LISTU"
+#define UTSIL "UTSIL "
 
 void help();
 void users();
@@ -20,6 +25,9 @@ void *communicate();
 void sigComm(int sig);
 void usage();
 void testPrint(char* string);
+void testPrintInt(int i);
+
+/* TODO Replace bzero with memset */
 
 bool verbose = false;
 
@@ -37,9 +45,10 @@ struct user {
 	char name[80];
 	char* ip;
 	struct user *next;
+	struct user *prev;
 };
 
-struct user *HEAD, *userCursor;
+struct user *HEAD, *userCursor, *userCursorPrev;
 
 int main(int argc, char **argv) {
 	int opt, port, argumentsPassed = 0;
@@ -134,6 +143,7 @@ int main(int argc, char **argv) {
 	/* Initializing user list */
 	HEAD = malloc(sizeof(struct user));
 	HEAD->next = 0;
+	HEAD->prev = 0;
 	userCursor = HEAD;
 
 	int selectRet = 0;
@@ -259,7 +269,7 @@ void *login(void *vargp){
 		cmd = strstr(buf, WOLFIE);
 		if(cmd != NULL){
 			if(verbose){
-				printf("%sWOLFIE recieved\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				printf("%sWOLFIE received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 			char connect[] = "EIFLOW \r\n\r\n";
 			write(connfd, connect, strlen(connect));
@@ -292,7 +302,7 @@ void *login(void *vargp){
 				cmd = strstr(buf, IAM);
 				if(cmd != NULL){
 					if(verbose){
-						printf("%sIAM recieved\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+						printf("%sIAM received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 					}
 
 					char name[strlen(buf)];
@@ -329,17 +339,18 @@ void *login(void *vargp){
 					if(uniqueName){
 						if(usersConnected){
 							userCursor->next = malloc(sizeof(struct user));
+							userCursorPrev = userCursor;
 							userCursor = userCursor->next;
-							/* Initialize */
+							userCursor->prev = userCursorPrev;
 						} 
-
+						/* Initialize */
 						strncpy(userCursor->name, userName, 80);
 						userCursor->connfd = connfd;
 						userCursor->timeJoined = time(0);
 						userCursor->next = 0;
 
 						write(connfd, hiSend, strlen(hiSend));
-						testPrint(hiSend);
+						//testPrint(hiSend);
 						usersConnected++;
 						connected = true;
 
@@ -401,20 +412,50 @@ void* communicate(){
 		printf("%sCOMMUNICATION THREAD STARTED\n", VERBOSE_TEXT);
 	}
 	signal(SIGUSR1, sigComm);
-	FD_ZERO(&commfd);
 	int selectRet = 0;
 	while(true){
-		selectRet = select(maxfd + 1, &commfd, NULL, NULL, NULL);
+		userCursor = HEAD;
+		/*
+		FD_SET(userCursor->connfd, &commfd);
+		while(userCursor->next != 0){
+			userCursor = userCursor->next;
+			FD_SET(userCursor->connfd, &commfd);
+		}
+		*/
+		int i = 0;
+		FD_ZERO(&commfd);
+		for(;i < usersConnected; i++){
+			FD_SET(userCursor->connfd, &commfd);
+			userCursor = userCursor->next;
+		}
+		/*
+		userCursor = HEAD;
+		i = 0;
+		for(;i < FD_SETSIZE; i++){
+			testPrintInt(i);
+			char test1[] = "\t";
+			char t[] = "TRUE";
+			char f[] = "FALSE";
+			char nl[] = "\n";
+			testPrint(test1);
+			if(FD_ISSET(i, &commfd)){
+				testPrint(t);
+			} else {
+				testPrint(f);
+			}
+			testPrint(nl);
+		}
+		*/
+		selectRet = select(FD_SETSIZE, &commfd, NULL, NULL, NULL);
 		/* If select returns anything less than 0, that means
 		It was interrupted by the signal sent when a login thread
 		has a new fd to listen to. */
 		if(selectRet > 0){
-			write(1, "FD\n", 3);
 			int i = 0;
 			bool clientReady = false;
 			char buf[MAX_LINE];
 			/* Go through all possible fd */
-			for(; i < FD_SETSIZE; i++){
+			for(; i < maxfd; i++){
 				/* Check to see if the ith fd is triggered */
 				if(FD_ISSET(i, &commfd)){
 					/* Find out of that fd corresponds to a user */
@@ -458,19 +499,110 @@ void* communicate(){
 						verbFound = true;
 					}
 					if(verbFound){
-						char test[] = "VERB FOUND!\n";
-						write(i, test, strlen(test));
+						cmd = strstr(buf, TIME);
+						if(cmd != NULL){
+							/* TIME verb found */
+							if(verbose){
+								char timeReceived[] = "TIME received\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, timeReceived, strlen(timeReceived));
+							}
+							userCursor = HEAD;
+							bool clientFound = false;
+							while(!clientFound){
+								if(userCursor->connfd != i){
+									userCursor = userCursor->next;
+								} else {
+									clientFound = true;
+								}
+							}
+							time_t timeToSend = time(0) - userCursor->timeJoined;
+							/* Note: This will not work if the user
+							is connected for more than 317 years. 
+							Maybe add in another buffer 317 years from now.
+							I need to amuse myself somehow. */
+							char timeBuffer[10];
+							sprintf(timeBuffer, "%d", (int) timeToSend);
+
+							char bufferToSend[strlen(EMIT) + strlen(timeBuffer) + strlen(ENDVERB)];
+							strcpy(bufferToSend, EMIT);
+							strcat(bufferToSend, timeBuffer);
+							strcat(bufferToSend, ENDVERB);
+
+							write(i, bufferToSend, strlen(bufferToSend));
+							if(verbose){
+								char timeSent[] = "EMIT sent\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, timeSent, strlen(timeSent));
+							}
+						}
+						cmd = strstr(buf, LISTU);
+						if(cmd != NULL){
+							/* LISTU verb found */
+							if(verbose){
+								char listuReceived[] = "LISTU received\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, listuReceived, strlen(listuReceived));
+							}
+							char userBuffer[MAX_LINE];
+							memset(userBuffer, 0, MAX_LINE);
+							userCursor = HEAD;
+							strcpy(userBuffer, UTSIL);
+							strcat(userBuffer, userCursor->name);
+							strcat(userBuffer, "\r\n");
+							while(userCursor->next != 0){
+								userCursor = userCursor->next;
+								strcat(userBuffer, userCursor->name);
+								strcat(userBuffer, "\r\n");
+							}
+							strcat(userBuffer, ENDVERB);
+
+							write(i, userBuffer, strlen(userBuffer));
+							if(verbose){
+								char sent[] = "UTSIL sent\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, sent, strlen(sent));
+							}
+						}
+						cmd = strstr(buf, BYE_NO_PRO);
+						if(cmd != NULL){
+							/* BYE verb found */
+							if(verbose){
+								char received[] = "BYE received\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, received, strlen(received));
+							}
+							userCursor = HEAD;
+							bool clientFound = false;
+							while(!clientFound){
+								if(userCursor-> connfd != i){
+									userCursor = userCursor->next;
+								} else {
+									clientFound = true;
+								}
+							}
+
+							write(i, BYE, strlen(BYE));
+							if(verbose){
+								char sent[] = "BYE sent\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, sent, strlen(sent));
+							}
+							close(userCursor->connfd);
+							if(userCursor->prev != 0){
+								userCursorPrev = userCursor->prev;
+								userCursorPrev->next = userCursor->next;
+							} else {
+								HEAD = userCursor->next;
+								HEAD->prev = 0;
+							}
+							free(userCursor);
+							usersConnected--;
+						}
 					}
 				}
 			}
 		} 
-		userCursor = HEAD;
-		FD_ZERO(&commfd);
-		FD_SET(userCursor->connfd, &commfd);
-		while(userCursor->next != 0){
-			userCursor = userCursor->next;
-			FD_SET(userCursor->connfd, &commfd);
-		}
 	}
 	return NULL;
 }
@@ -498,6 +630,31 @@ void users(){
 }
 
 int sd(){
+	userCursor = HEAD;
+	if(usersConnected > 0){
+		write(userCursor->connfd, BYE, strlen(BYE));
+		if(verbose){
+			printf("%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+		}
+		while(userCursor->next != 0){
+			userCursor = userCursor->next;
+			write(userCursor->connfd, BYE, strlen(BYE));
+			if(verbose){
+				printf("%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+			}
+		}
+	}
+	userCursor = HEAD;
+	if(usersConnected > 0){
+		while(userCursor->prev !=0){
+			while(userCursor->next != 0){
+				userCursor = userCursor->next;
+			}
+			close(userCursor->connfd);
+			userCursor = userCursor->prev;
+			free(userCursor->next);
+		}
+	}
 	free(HEAD);
 	return EXIT_SUCCESS;
 }
@@ -521,7 +678,13 @@ void usage(){
 
 void testPrint(char* string){
 	FILE *file;
-	file = fopen("test.txt", "wt");
+	file = fopen("test.txt", "a");
 	fprintf(file, "%s", string);
 	fclose(file);
+}
+
+void testPrintInt(int i){
+	char buffer[5];
+	sprintf(buffer, "%d", i);
+	testPrint(buffer);
 }
