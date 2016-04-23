@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <time.h>
 
 
 /* Default file permissions are DEF_MODE & ~DEF_UMASK */
