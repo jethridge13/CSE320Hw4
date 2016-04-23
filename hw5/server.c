@@ -576,7 +576,6 @@ void* communicate(){
 									clientFound = true;
 								}
 							}
-
 							write(i, BYE, strlen(BYE));
 							if(verbose){
 								char sent[] = "BYE sent\n";
@@ -584,15 +583,20 @@ void* communicate(){
 								write(1, sent, strlen(sent));
 							}
 							close(userCursor->connfd);
-							if(userCursor->prev != 0){
-								userCursorPrev = userCursor->prev;
-								userCursorPrev->next = userCursor->next;
+							if(usersConnected > 1){
+								if(userCursor->prev != 0){
+									userCursorPrev = userCursor->prev;
+									userCursorPrev->next = userCursor->next;
+								} else {
+									HEAD = userCursor->next;
+									HEAD->prev = 0;
+								}
+								free(userCursor);
+								usersConnected--;
 							} else {
-								HEAD = userCursor->next;
-								HEAD->prev = 0;
+								close(userCursor->connfd);
+								usersConnected--;
 							}
-							free(userCursor);
-							usersConnected--;
 						}
 					}
 				}
