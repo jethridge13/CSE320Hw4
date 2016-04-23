@@ -383,10 +383,6 @@ void *login(void *vargp){
 		return NULL;
 	}
 
-	/* Update the communication thread 
-	fd_set to listen to this client in 
-	the communication thread. */
-	FD_SET(connfd, &commfd);
 	if(connfd > maxfd){
 		maxfd = connfd;
 	}
@@ -423,15 +419,14 @@ void* communicate(){
 		}
 		*/
 		int i = 0;
-		FD_ZERO(&commfd);
 		for(;i < usersConnected; i++){
 			FD_SET(userCursor->connfd, &commfd);
 			userCursor = userCursor->next;
 		}
-		/*
+		
 		userCursor = HEAD;
 		i = 0;
-		for(;i < FD_SETSIZE; i++){
+		for(;i < maxfd + 1; i++){
 			testPrintInt(i);
 			char test1[] = "\t";
 			char t[] = "TRUE";
@@ -445,8 +440,8 @@ void* communicate(){
 			}
 			testPrint(nl);
 		}
-		*/
-		selectRet = select(FD_SETSIZE, &commfd, NULL, NULL, NULL);
+
+		selectRet = select(maxfd + 1, &commfd, NULL, NULL, NULL);
 		/* If select returns anything less than 0, that means
 		It was interrupted by the signal sent when a login thread
 		has a new fd to listen to. */
@@ -455,7 +450,7 @@ void* communicate(){
 			bool clientReady = false;
 			char buf[MAX_LINE];
 			/* Go through all possible fd */
-			for(; i < maxfd; i++){
+			for(; i < maxfd + 1; i++){
 				/* Check to see if the ith fd is triggered */
 				if(FD_ISSET(i, &commfd)){
 					/* Find out of that fd corresponds to a user */
