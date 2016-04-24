@@ -320,7 +320,7 @@ void *login(void *vargp){
 					char* userName = strtok(name, ENDVERB);
 					userName = strtok(userName, " ");
 
-					char hiSend[strlen(name) + strlen(hi) + 4 + 1];
+					char hiSend[strlen(name) + strlen(hi) + 6];
 					strcpy(hiSend, hi);
 					strcat(hiSend, name);
 					strcat(hiSend, ENDVERB);
@@ -360,6 +360,7 @@ void *login(void *vargp){
 
 						write(connfd, hiSend, strlen(hiSend));
 						write(connfd, motd, strlen(motd));
+                        write(connfd, "\n\n", 2);
 						//testPrint(hiSend);
 						usersConnected++;
 						connected = true;
