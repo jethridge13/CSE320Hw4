@@ -641,8 +641,74 @@ void* communicate(){
 						}
 						cmd = strstr(buf, MSG);
 						if(cmd != NULL){
-							/* MSG verb found */
+							/* Can just recycle the MSG <TO> <FROM> <MESSAGE>
+							received from the client and forward it to both. */
 
+							/* MSG verb found */
+							if(verbose){
+								char received[] = "MSG received\n";
+								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+								write(1, received, strlen(received));
+							}
+
+							char bufCpy[MAX_LINE];
+							strcpy(bufCpy, buf);
+
+							char* token = strtok(buf, " ");
+							/* token holds MSG */
+							token = strtok(NULL, " ");
+							/* token holds <TO> */
+							char to[80];
+							strcpy(to, token);
+							token = strtok(NULL, " ");
+							/* token holds <FROM> */
+							char from[80];
+							strcpy(from, token);
+
+							bool toFound = false;
+							bool fromFound = false;
+
+							userCursor = HEAD;
+							if(!strcmp(userCursor->name, to)){
+								userCursorPrev = userCursor;
+								toFound = true;
+							}
+							while (!toFound && userCursor->next != 0){
+								userCursor = userCursor->next;
+								if(!strcmp(userCursor->name, to)){
+									userCursorPrev = userCursor;
+									toFound = true;
+								}
+							}
+							if(!toFound){
+								char error[] = "ERR 100 '<TO> User not found.' \r\n\r\n";
+								write(i, error, strlen(error));
+							} else {
+								userCursor = HEAD;
+								if(!strcmp(userCursor->name, from)){
+									fromFound = true;
+								}
+								while (!fromFound && userCursor->next != 0){
+									userCursor = userCursor->next;
+									if(!strcmp(userCursor->name, from)){
+										fromFound = true;
+									}
+								}
+								if(!fromFound){
+									char error[] = "ERR 100 '<FROM> User not found.' \r\n\r\n";
+									write(i, error, strlen(error));
+								}
+							}
+							if(toFound && fromFound){
+								write(userCursorPrev->connfd, bufCpy, strlen(bufCpy));
+								write(i, bufCpy, strlen(bufCpy));
+
+								if(verbose){
+									char sent[] = "MSG sent\n";
+									write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+									write(1, sent, strlen(sent));
+								}
+							}
 						}
 					}
 				}
