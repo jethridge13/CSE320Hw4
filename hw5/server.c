@@ -25,6 +25,7 @@ int sd();
 void *login(void *connfd);
 void *communicate();
 void sigComm(int sig);
+void sigShutDown();
 void usage();
 void testPrint(char* string);
 void testPrintInt(int i);
@@ -56,6 +57,9 @@ struct user *HEAD, *userCursor, *userCursorPrev;
 char* motd = NULL;
 
 int main(int argc, char **argv) {
+
+	signal(SIGINT, sigShutDown);
+
 	int opt, port, argumentsPassed = 0;
 	int connfd;
 	int clientlen;
@@ -320,7 +324,7 @@ void *login(void *vargp){
 					strcpy(hiSend, hi);
 					strcat(hiSend, name);
 					strcat(hiSend, ENDVERB);
-					strcat(hiSend, "\0");
+					//strcat(hiSend, "\0");
 
 					bool uniqueName = true;
 
@@ -659,6 +663,10 @@ void sigComm(int sig){
 	signal(SIGUSR1, sigComm);
 }
 
+void sigShutDown(){
+	exit(sd());
+}
+
 void users(){
 	if(!usersConnected){
 		printf("%sNo users connected.\n", NORMAL_TEXT);
@@ -678,6 +686,7 @@ void users(){
 }
 
 int sd(){
+	printf("%sSHUTTING DOWN\n", NORMAL_TEXT);
 	userCursor = HEAD;
 	if(usersConnected > 0){
 		write(userCursor->connfd, BYE, strlen(BYE));
