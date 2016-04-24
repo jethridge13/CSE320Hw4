@@ -10,12 +10,14 @@
 #define ENDVERB "\r\n\r\n"
 #define WOLFIE "WOLFIE"
 #define IAM "IAM "
-#define BYE "BYE\r\n\r\n"
-#define BYE_NO_PRO "BYE"
+#define BYE "BYE \r\n\r\n\0"
+#define BYE_NO_PRO "BYE "
 #define TIME "TIME"
 #define EMIT "EMIT "
 #define LISTU "LISTU"
 #define UTSIL "UTSIL "
+#define MSG "MSG"
+#define UOFF "UOFF "
 
 void help();
 void users();
@@ -51,12 +53,13 @@ struct user {
 
 struct user *HEAD, *userCursor, *userCursorPrev;
 
+char* motd = NULL;
+
 int main(int argc, char **argv) {
 	int opt, port, argumentsPassed = 0;
 	int connfd;
 	int clientlen;
 	char* portNumber = NULL;
-	char* motd = NULL;
 
 	while((opt = getopt(argc, argv, "hv")) != -1) {
         switch(opt) {
@@ -313,10 +316,11 @@ void *login(void *vargp){
 					char* userName = strtok(name, ENDVERB);
 					userName = strtok(userName, " ");
 
-					char hiSend[strlen(name) + strlen(hi) + 4];
+					char hiSend[strlen(name) + strlen(hi) + 4 + 1];
 					strcpy(hiSend, hi);
 					strcat(hiSend, name);
 					strcat(hiSend, ENDVERB);
+					strcat(hiSend, "\0");
 
 					bool uniqueName = true;
 
@@ -351,6 +355,7 @@ void *login(void *vargp){
 						userCursor->next = 0;
 
 						write(connfd, hiSend, strlen(hiSend));
+						write(connfd, motd, strlen(motd));
 						//testPrint(hiSend);
 						usersConnected++;
 						connected = true;
@@ -366,15 +371,15 @@ void *login(void *vargp){
 					}
 				}
 			} else {
-				char error[] = "ERR 1 'Expected IAM.' \r\n\r\n";
+				char error[] = "ERR 00 'Expected IAM.' \r\n\r\n";
 				write(connfd, error, strlen(error));
 			}
 		} else {
-			char error[] = "ERR 1 'Expected WOLFIE.' \r\n\r\n";
+			char error[] = "ERR 00 'Expected WOLFIE.' \r\n\r\n";
 			write(connfd, error, strlen(error));
 		}
 	} else {
-		char error[] = "ERR 1 'Verb not found.' \r\n\r\n";
+		char error[] = "ERR 00 'Verb not found.' \r\n\r\n";
 		write(connfd, error, strlen(error));
 	}
 
@@ -413,6 +418,8 @@ void* communicate(){
 	while(true){
 		userCursor = HEAD;
 		/*
+		FD_ZERO(&commfd);
+		userCursor = HEAD;
 		FD_SET(userCursor->connfd, &commfd);
 		while(userCursor->next != 0){
 			userCursor = userCursor->next;
@@ -424,8 +431,8 @@ void* communicate(){
 			FD_SET(userCursor->connfd, &commfd);
 			userCursor = userCursor->next;
 		}
-		
 		userCursor = HEAD;
+		/*
 		i = 0;
 		for(;i < maxfd + 1; i++){
 			testPrintInt(i);
@@ -441,7 +448,7 @@ void* communicate(){
 			}
 			testPrint(nl);
 		}
-
+		*/
 		selectRet = select(maxfd + 1, &commfd, NULL, NULL, NULL);
 		/* If select returns anything less than 0, that means
 		It was interrupted by the signal sent when a login thread
@@ -520,10 +527,11 @@ void* communicate(){
 							char timeBuffer[10];
 							sprintf(timeBuffer, "%d", (int) timeToSend);
 
-							char bufferToSend[strlen(EMIT) + strlen(timeBuffer) + strlen(ENDVERB)];
+							char bufferToSend[strlen(EMIT) + strlen(timeBuffer) + strlen(ENDVERB) + 1];
 							strcpy(bufferToSend, EMIT);
 							strcat(bufferToSend, timeBuffer);
 							strcat(bufferToSend, ENDVERB);
+							strcat(bufferToSend, "\0");
 
 							write(i, bufferToSend, strlen(bufferToSend));
 							if(verbose){
@@ -546,6 +554,7 @@ void* communicate(){
 							strcpy(userBuffer, UTSIL);
 							strcat(userBuffer, userCursor->name);
 							strcat(userBuffer, "\r\n");
+							strcat(userBuffer, "\0");
 							while(userCursor->next != 0){
 								userCursor = userCursor->next;
 								strcat(userBuffer, userCursor->name);
@@ -583,6 +592,13 @@ void* communicate(){
 								write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
 								write(1, sent, strlen(sent));
 							}
+
+							/* store the name for UOFF */
+							char userName[80];
+							strcpy(userName, userCursor->name);
+
+							/* Close everything */
+							//FD_CLR(userCursor->connfd, &commfd);
 							close(userCursor->connfd);
 							if(usersConnected > 1){
 								if(userCursor->prev != 0){
@@ -598,6 +614,30 @@ void* communicate(){
 								close(userCursor->connfd);
 								usersConnected--;
 							}
+							/* Send UOFF to all remaining users */
+							if(usersConnected > 0){
+								char uoff[strlen(UOFF) + strlen(userName) + strlen(ENDVERB)];
+								strcpy(uoff, UOFF);
+								strcat(uoff, userName);
+								strcat(uoff, ENDVERB);
+								userCursor = HEAD;
+								write(userCursor->connfd, uoff, strlen(uoff));
+								if(verbose){
+									printf("%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+								}
+								while(userCursor->next != 0){
+									userCursor = userCursor->next;
+									write(userCursor->connfd, uoff, strlen(uoff));
+									if(verbose){
+										printf("%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+									}
+								}
+							}
+						}
+						cmd = strstr(buf, MSG);
+						if(cmd != NULL){
+							/* MSG verb found */
+
 						}
 					}
 				}
@@ -605,6 +645,9 @@ void* communicate(){
 		}
 		if(!usersConnected){
 			FD_ZERO(&commfd);
+			if(verbose){
+				printf("%sCOMMUNICATION THREAD ENDED\n", VERBOSE_TEXT);
+			}
 			commRun = false;
 			pthread_exit(EXIT_SUCCESS);
 		}
