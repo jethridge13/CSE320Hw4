@@ -10,6 +10,8 @@
 #define ENDVERB "\r\n\r\n"
 #define WOLFIE "WOLFIE"
 #define IAM "IAM "
+#define IAMNEW "IAMNEW "
+#define NEWPASS "NEWPASS "
 #define BYE "BYE \r\n\r\n\0"
 #define BYE_NO_PRO "BYE "
 #define TIME "TIME"
@@ -21,7 +23,9 @@
 
 void help();
 void users();
+void accounts();
 int sd();
+bool validPassword(char* password);
 void *login(void *connfd);
 void *communicate();
 void sigComm(int sig);
@@ -32,10 +36,14 @@ void testPrintInt(int i);
 
 /* TODO Replace bzero with memset */
 /* TODO Fix communication thread for when all users disconnect */
+/* TODO Make it so that the IAM verb tests for account */
 
 bool verbose = false;
 
 int usersConnected = 0;
+int accountsInFile = 0;
+
+FILE *accountfd = NULL;
 
 pthread_t commT;
 bool commRun = false;
@@ -52,9 +60,19 @@ struct user {
 	struct user *prev;
 };
 
+struct account {
+	char name[80];
+	char pwd[80];
+	struct account *next;
+	struct account *prev;
+};
+
 struct user *HEAD, *userCursor, *userCursorPrev;
 
+struct account *AHEAD, *AuserCursor, *AuserCursorPrev;
+
 char* motd = NULL;
+char* accountFile = NULL;
 
 int main(int argc, char **argv) {
 
@@ -79,15 +97,17 @@ int main(int argc, char **argv) {
             	break;
         }
     }
-	if(optind < argc && (argc - optind) == 2) {
+    int addArgs = argc - optind;
+	if(optind < argc && (addArgs == 3 || addArgs == 2)) {
 		portNumber = argv[optind++];
 		motd = argv[optind++];
+		accountFile = argv[optind++];
     } else {
-        if((argc - optind) <= 0) {
+        if(addArgs <= 0) {
             fprintf(stderr, "%sMissing PORT_NUMBER and MOTD.\n", ERROR_TEXT);
-        } else if((argc - optind) == 1) {
+        } else if(addArgs == 1) {
             fprintf(stderr, "%sMissing MOTD.\n", ERROR_TEXT);
-        } else {
+        } else if (addArgs > 3){
             fprintf(stderr, "%sToo many arguments provided.\n", ERROR_TEXT);
         }
         usage();
@@ -98,13 +118,53 @@ int main(int argc, char **argv) {
     if(!port){
     	fprintf(stderr, "%sInvalid PORT_NUMBER\n", ERROR_TEXT);
     	usage();
+    	return EXIT_FAILURE;
     }
 
-    /* TODO Remove this 
-    Maybe not. I kinda like it...*/
+    /* Initializing account list */
+	AHEAD = malloc(sizeof(struct account));
+	AHEAD->next = 0;
+	AHEAD->prev = 0;
+	AuserCursor = AHEAD;
+
+    if(accountFile != NULL){
+    	struct stat dfe;
+    	int fe = stat(accountFile, &dfe);
+    	bool fileExists = !fe;
+    	if(fileExists){
+			accountfd = fopen(accountFile, "r");
+			char* readBuffer = NULL;
+			size_t length = 0;
+			while(getline(&readBuffer, &length, accountfd) != -1) {
+				char* accountName = strtok(readBuffer, "\t");
+				char* passWord = strtok(NULL, "\n");
+				if(accountsInFile){
+					AuserCursor->next = malloc(sizeof(struct user));
+					AuserCursorPrev = AuserCursor;
+					AuserCursor = AuserCursor->next;
+					AuserCursor->prev = AuserCursorPrev;
+				} 
+										
+				strncpy(AuserCursor->name, accountName, 80);
+				AuserCursor->next = 0;
+				strncpy(AuserCursor->pwd, passWord, 80);
+
+				accountsInFile++;
+
+				readBuffer = NULL;
+				length = 0;
+			}
+			fclose(accountfd);
+			accountfd = fopen(accountFile, "w");
+    	} else {
+    		accountFile = NULL;
+    		printf("%sACCOUNTS_FILE does not exists. Using no file instead.\n", ERROR_TEXT);
+    	}
+	}
     if(verbose){
     	printf("%sPORT_NUMBER: %d\n%s", VERBOSE_TEXT, port, NORMAL_TEXT);
     	printf("%sMOTD: %s\n%s", VERBOSE_TEXT, motd, NORMAL_TEXT);
+    	printf("%sACCOUNTS_FILE: %s\n%s", VERBOSE_TEXT, accountFile, NORMAL_TEXT);
 	}
 
 	int listenfd;
@@ -220,8 +280,8 @@ int main(int argc, char **argv) {
 				return sd();
 			} else if(!strcmp(cmd, "/users")){
 				users();
-			} else {
-				help();
+			} else if(!strcmp(cmd, "/accts")){
+				accounts();
 			}
 		}
 
@@ -255,12 +315,6 @@ void *login(void *vargp){
 			char buf2[charLeft];
 			read(connfd, buf2, charLeft);
 			strcpy(buf+strlen(buf), buf2);
-			/*
-			FILE *file;
-			file = fopen("test.txt", "wt");
-			fprintf(file, "%s", buf);
-			fclose(file);
-			*/
 			cmd = strstr(buf, ENDVERB);
 			if(cmd != NULL){
 				verbFound = true;
@@ -361,7 +415,6 @@ void *login(void *vargp){
 						write(connfd, hiSend, strlen(hiSend));
 						write(connfd, motd, strlen(motd));
                         write(connfd, "\n\n", 2);
-						//testPrint(hiSend);
 						usersConnected++;
 						connected = true;
 
@@ -374,21 +427,167 @@ void *login(void *vargp){
 						write(connfd, BYE, strlen(BYE));
 						close(connfd);
 					}
+				} else {
+					cmd = strstr(buf, IAMNEW);
+					if(cmd != NULL){
+						if(verbose){
+							printf("%sIAMNEW received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+						}
+						char name[strlen(buf)];
+						memcpy(name, &buf[7], strlen(buf) - 2);
+						char hi[] = "HINEW ";
+
+						char* userName = strtok(name, ENDVERB);
+						userName = strtok(userName, " ");
+
+						char hiSend[strlen(name) + strlen(hi) + 6];
+						strcpy(hiSend, hi);
+						strcat(hiSend, name);
+						strcat(hiSend, ENDVERB);
+						/* hiSend now containts HINEW <name> <ENDVERB> */
+
+						bool notDuplicate = true;
+
+						if(accountsInFile > 0){
+							/* TODO When accounts are actually loaded */
+							notDuplicate = true;
+							AuserCursor = AHEAD;
+							if(!strcmp(userName, AuserCursor->name)){
+								notDuplicate = false;
+							}
+							while(AuserCursor->next != 0){
+								AuserCursor = AuserCursor->next;
+								if(!strcmp(userName, AuserCursor->name)){
+									notDuplicate = false;
+								}
+							}
+						} 
+						if(notDuplicate) {
+							write(connfd, hiSend, strlen(hiSend));
+							if(verbose){
+								printf("%sHINEW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							}
+
+							bzero(buf, MAX_LINE);
+							read(connfd, buf, MAX_LINE);
+							cmd = strstr(buf, ENDVERB);
+							charLeft = MAX_LINE;
+							verbFound = false;
+							if(cmd == NULL){
+								while(charLeft > 0){
+									char buf2[charLeft];
+									read(connfd, buf2, charLeft);
+									strcpy(buf+strlen(buf), buf2);
+
+									cmd = strstr(buf, ENDVERB);
+									if(cmd != NULL){
+										verbFound = true;
+										break;
+									}
+									charLeft = charLeft - strlen(buf);
+								}
+							} else {
+								verbFound = true;
+							}
+							if(verbFound){
+								cmd = strstr(buf, NEWPASS);
+								if(cmd != NULL){
+									if(verbose){
+										printf("%sNEWPASS received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+									}
+									char pass[strlen(buf)];
+									memcpy(pass, &buf[7], strlen(buf) - 2);
+									char hi[] = "NEWPASS";
+
+									char* passWord = strtok(pass, ENDVERB);
+									passWord = strtok(passWord, " ");
+
+									char passSend[strlen(pass) + strlen(hi) + 4];
+									strcpy(passSend, hi);
+									strcat(passSend, pass);
+									strcat(passSend, ENDVERB);
+
+									/* Test if password meets criteria */
+									bool valid = validPassword(passWord);
+
+									if(valid){
+										char validP[] = "SSAPWEN \r\n\r\n";
+										write(connfd, validP, strlen(validP));
+										if(verbose){
+											printf("%sSSAPWEN sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+										}
+
+										char hi[] = "HI ";
+										char hiSend[strlen(name) + strlen(hi) + 6];
+										strcpy(hiSend, hi);
+										strcat(hiSend, name);
+										strcat(hiSend, ENDVERB);
+
+										/* Initialize user */
+										if(usersConnected){
+											userCursor->next = malloc(sizeof(struct user));
+											userCursorPrev = userCursor;
+											userCursor = userCursor->next;
+											userCursor->prev = userCursorPrev;
+										} 
+										
+										strncpy(userCursor->name, userName, 80);
+										userCursor->connfd = connfd;
+										userCursor->timeJoined = time(0);
+										userCursor->next = 0;
+
+										/* Initialize account */
+										if(accountsInFile){
+											AuserCursor->next = malloc(sizeof(struct user));
+											AuserCursorPrev = AuserCursor;
+											AuserCursor = AuserCursor->next;
+											AuserCursor->prev = AuserCursorPrev;
+										} 
+										
+										strncpy(AuserCursor->name, userName, 80);
+										AuserCursor->next = 0;
+										strncpy(AuserCursor->pwd, passWord, 80);
+
+										write(connfd, hiSend, strlen(hiSend));
+										if(verbose){
+											printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+										}
+
+										write(connfd, motd, strlen(motd));
+										write(connfd, "\n\n", 2);
+										usersConnected++;
+										accountsInFile++;
+										connected = true;
+									} else {
+										char error[] = "ERR 02 'BAD PASSWORD' \r\n\r\n";
+										write(connfd, error, strlen(error));
+									}
+								} else {
+									char error[] = "ERR 100 'Expected NEWPASS' \r\n\r\n";
+									write(connfd, error, strlen(error));
+								}
+							}
+						} else {
+							char error[] = "ERR 00 'USER NAME TAKEN' \r\n\r\n";
+							write(connfd, error, strlen(error));
+						}
+					}
 				}
 			} else {
-				char error[] = "ERR 00 'Expected IAM.' \r\n\r\n";
+				char error[] = "ERR 100 'Expected IAM or IAMNEW' \r\n\r\n";
 				write(connfd, error, strlen(error));
 			}
 		} else {
-			char error[] = "ERR 00 'Expected WOLFIE.' \r\n\r\n";
+			char error[] = "ERR 100 'Expected WOLFIE.' \r\n\r\n";
 			write(connfd, error, strlen(error));
 		}
 	} else {
-		char error[] = "ERR 00 'Verb not found.' \r\n\r\n";
+		char error[] = "ERR 100 'Verb not found.' \r\n\r\n";
 		write(connfd, error, strlen(error));
 	}
 
 	if(!connected){
+		write(connfd, BYE, strlen(BYE));
 		close(connfd);
 		pthread_exit(EXIT_SUCCESS);
 		return NULL;
@@ -437,23 +636,7 @@ void* communicate(){
 			userCursor = userCursor->next;
 		}
 		userCursor = HEAD;
-		/*
-		i = 0;
-		for(;i < maxfd + 1; i++){
-			testPrintInt(i);
-			char test1[] = "\t";
-			char t[] = "TRUE";
-			char f[] = "FALSE";
-			char nl[] = "\n";
-			testPrint(test1);
-			if(FD_ISSET(i, &commfd)){
-				testPrint(t);
-			} else {
-				testPrint(f);
-			}
-			testPrint(nl);
-		}
-		*/
+
 		selectRet = select(maxfd + 1, &commfd, NULL, NULL, NULL);
 		/* If select returns anything less than 0, that means
 		It was interrupted by the signal sent when a login thread
@@ -734,6 +917,35 @@ void sigShutDown(){
 	exit(sd());
 }
 
+bool validPassword(char* password){
+	bool valid = true;
+	bool cap = false;
+	bool symbol = false;
+	bool number = false;
+	char *caps = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	char *symbols = "!@#$^&*()_+-=~`<>,.?;'{}[]|";
+	char *numbers = "0123456789";
+	if(strlen(password) < 5){
+		valid = false;
+		return false;
+	}
+	while(*password){
+		if(strchr(caps, *password)){
+			cap = true;
+		}
+		if(strchr(symbols, *password)){
+			symbol = true;
+		}
+		if(strchr(numbers, *password)){
+			number = true;
+		}
+		password++;
+	}
+
+	valid = cap && symbol && number;
+	return valid;
+}
+
 void users(){
 	if(!usersConnected){
 		printf("%sNo users connected.\n", NORMAL_TEXT);
@@ -748,6 +960,22 @@ void users(){
 
 			printf("%s%d: %s	FD: %d\n", 
 				NORMAL_TEXT, ++i, userCursor->name, userCursor->connfd);
+		}
+	}
+}
+
+void accounts(){
+	if(!accountsInFile){
+		printf("%sNo accounts available.\n", NORMAL_TEXT);
+	} else {
+		AuserCursor = AHEAD;
+		int i = 0;
+		printf("%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
+
+		while(AuserCursor->next != 0){
+			AuserCursor = AuserCursor->next;
+
+			printf("%s%d:	%s", NORMAL_TEXT, ++i, AuserCursor->name);
 		}
 	}
 }
@@ -780,6 +1008,35 @@ int sd(){
 		}
 	}
 	free(HEAD);
+	if(accountfd != NULL){
+		AuserCursor = AHEAD;
+		if(accountsInFile > 0){
+			write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
+			write(fileno(accountfd), "\t", 1);
+			write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
+			write(fileno(accountfd), "\n", 1);
+			while(AuserCursor->next != 0){
+				AuserCursor = AuserCursor->next;
+
+				write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
+				write(fileno(accountfd), "\t", 1);
+				write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
+				write(fileno(accountfd), "\n", 1);
+			}
+		}
+		fclose(accountfd);
+	}
+	AuserCursor = AHEAD;
+	if(usersConnected > 0){
+		while(AuserCursor->prev != 0){
+			while(AuserCursor->next != 0){
+				AuserCursor = AuserCursor->next;
+			}
+			AuserCursor = AuserCursor->prev;
+			free(AuserCursor->next);
+		}
+	}
+	free(AHEAD);
 	return EXIT_SUCCESS;
 }
 
@@ -793,11 +1050,12 @@ void help(){
 
 void usage(){
 	printf(
-		"%s./server [-h|-v] PORT_NUMBER MOTD\n"
+		"%s./server [-h|-v] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n"
 		"-h 			Displays help menu & returns EXIT_SUCCESS.\n"
 		"-v 			Verbose print all incoming and outgoing protocol verbs & content.\n"
 		"PORT_NUMBER 	Port number to listn on.\n"
-		"MOTD 			Message to display to the client when they connect.\n", NORMAL_TEXT);
+		"MOTD 			Message to display to the client when they connect.\n"
+		"ACCOUNTS_FILE 	File containing username and password data to be loaded upon execution.\n", NORMAL_TEXT);
 }
 
 void testPrint(char* string){
