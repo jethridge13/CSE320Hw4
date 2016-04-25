@@ -12,6 +12,7 @@
 #define IAM "IAM "
 #define IAMNEW "IAMNEW "
 #define NEWPASS "NEWPASS "
+#define PASS "PASS "
 #define BYE "BYE \r\n\r\n\0"
 #define BYE_NO_PRO "BYE "
 #define TIME "TIME"
@@ -380,6 +381,24 @@ void *login(void *vargp){
 					strcat(hiSend, ENDVERB);
 					//strcat(hiSend, "\0");
 
+					bool acctExists = false;
+
+					/* Make user accountname is unique */
+					AuserCursor = AHEAD;
+					if(accountsInFile > 1){
+						while(AuserCursor->next != 0){
+							if(!strcmp(userName, AuserCursor->name)){
+								acctExists = true;
+								break;
+							}
+						AuserCursor = AuserCursor->next;
+						}
+					} else if(accountsInFile == 1){
+						if(!strcmp(userName, AuserCursor->name)){
+							acctExists = true;
+						}
+					}
+
 					bool uniqueName = true;
 
 					/* Make user username is unique */
@@ -397,9 +416,72 @@ void *login(void *vargp){
 							uniqueName = false;
 						}
 					}
+
+					bool passwordMatch = false;
+
+					if(uniqueName && acctExists){
+						char auth[strlen(buf)];
+						memcpy(auth, &buf[4], strlen(buf) - 2);
+						char hi[] = "AUTH ";
+
+						char authSend[strlen(auth) + strlen(hi) + 6];
+						strcpy(authSend, hi);
+						strcat(authSend, name);
+						strcat(authSend, ENDVERB);
+
+						write(connfd, authSend, strlen(authSend));
+
+						if(verbose){
+							printf("%sAUTH sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+						}
+
+						bzero(buf, MAX_LINE);
+						read(connfd, buf, MAX_LINE);
+						cmd = strstr(buf, ENDVERB);
+						charLeft = MAX_LINE;
+						verbFound = false;
+						if(cmd == NULL){
+							while(charLeft > 0){
+								char buf2[charLeft];
+								read(connfd, buf2, charLeft);
+								strcpy(buf+strlen(buf), buf2);
+
+								cmd = strstr(buf, ENDVERB);
+								if(cmd != NULL){
+									verbFound = true;
+									break;
+								}
+								charLeft = charLeft - strlen(buf);
+							}
+						} else {
+							verbFound = true;
+						}
+						if(verbFound){
+							cmd = strstr(buf, PASS);
+							if(cmd != NULL){
+								char pwd[strlen(buf)];
+								memcpy(pwd, &buf[4], strlen(buf) - 2);
+								char hi[] = "SSAP ";
+
+								char* password = strtok(pwd, ENDVERB);
+								password = strtok(password, " ");
+
+								char passSend[strlen(pwd) + strlen(hi) + 6];
+								strcpy(passSend, hi);
+								strcat(passSend, pwd);
+								strcat(passSend, ENDVERB);
+
+								if(!strcmp(password, AuserCursor->pwd)){
+									passwordMatch = true;
+									write(connfd, passSend, strlen(passSend));
+								}
+							}
+						}
+					}
 					
-					/* If name user gave is unique */
-					if(uniqueName){
+					/* If name user gave is unique 
+						and acct exists */
+					if(uniqueName && acctExists && passwordMatch){
 						if(usersConnected){
 							userCursor->next = malloc(sizeof(struct user));
 							userCursorPrev = userCursor;
@@ -412,8 +494,15 @@ void *login(void *vargp){
 						userCursor->timeJoined = time(0);
 						userCursor->next = 0;
 
+						char message[MAX_LINE];
+						char motdverb[] = "MOTD ";
+
+						strcpy(message, motdverb);
+						strcat(message, motd);
+						strcat(message, ENDVERB);
+
 						write(connfd, hiSend, strlen(hiSend));
-						write(connfd, motd, strlen(motd));
+						write(connfd, message, strlen(message));
                         write(connfd, "\n\n", 2);
 						usersConnected++;
 						connected = true;
@@ -422,10 +511,22 @@ void *login(void *vargp){
 							printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 						}
 					} else {
-						char error[] = "ERR 00 'Name not unique.' \r\n\r\n";
-						write(connfd, error, strlen(error));
-						write(connfd, BYE, strlen(BYE));
-						close(connfd);
+						if(!uniqueName){
+							char error[] = "ERR 00 'USER NAME TAKEN.' \r\n\r\n";
+							write(connfd, error, strlen(error));
+							write(connfd, BYE, strlen(BYE));
+							close(connfd);
+						} else if(!acctExists){
+							char error[] = "ERR 01 'USER NOT AVAILABLE.' \r\n\r\n";
+							write(connfd, error, strlen(error));
+							write(connfd, BYE, strlen(BYE));
+							close(connfd);
+						} else {
+							char error[] = "ERR 02 'BAD PASSWORD.' \r\n\r\n";
+							write(connfd, error, strlen(error));
+							write(connfd, BYE, strlen(BYE));
+							close(connfd);
+						}
 					}
 				} else {
 					cmd = strstr(buf, IAMNEW);
@@ -553,7 +654,14 @@ void *login(void *vargp){
 											printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 										}
 
-										write(connfd, motd, strlen(motd));
+										char message[MAX_LINE];
+										char motdverb[] = "MOTD ";
+
+										strcpy(message, motdverb);
+										strcat(message, motd);
+										strcat(message, ENDVERB);
+
+										write(connfd, message, strlen(motd));
 										write(connfd, "\n\n", 2);
 										usersConnected++;
 										accountsInFile++;
