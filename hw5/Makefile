@@ -5,7 +5,7 @@ BINS = server client chat
 all: $(BINS)
 
 server:
-	$(CC) $(CFLAGS) server.c -o server -pthread
+	$(CC) $(CFLAGS) server.c -o server -pthread -lssl -lcrypto
 
 client:
 	$(CC) $(CFLAGS) client.c -o client

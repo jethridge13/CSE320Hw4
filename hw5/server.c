@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 
 #include "csapp.h"
+#include <openssl/sha.h>
+#include <openssl/rand.h>
 
 #define NORMAL_TEXT "\x1B[0m"
 #define ERROR_TEXT "\x1B[1;31m"
@@ -35,9 +37,7 @@ void usage();
 void testPrint(char* string);
 void testPrintInt(int i);
 
-/* TODO Replace bzero with memset */
-/* TODO Fix communication thread for when all users disconnect */
-/* TODO Make it so that the IAM verb tests for account */
+/* TODO Hashing and salt */
 
 bool verbose = false;
 
@@ -136,11 +136,12 @@ int main(int argc, char **argv) {
 			accountfd = fopen(accountFile, "r");
 			char* readBuffer = NULL;
 			size_t length = 0;
-			while(getline(&readBuffer, &length, accountfd) != -1) {
+			int whileRead = getdelim(&readBuffer, &length, 10, accountfd);
+			while(whileRead > 0) {
 				char* accountName = strtok(readBuffer, "\t");
 				char* passWord = strtok(NULL, "\n");
 				if(accountsInFile){
-					AuserCursor->next = malloc(sizeof(struct user));
+					AuserCursor->next = malloc(sizeof(struct account));
 					AuserCursorPrev = AuserCursor;
 					AuserCursor = AuserCursor->next;
 					AuserCursor->prev = AuserCursorPrev;
@@ -154,6 +155,8 @@ int main(int argc, char **argv) {
 
 				readBuffer = NULL;
 				length = 0;
+
+				whileRead = getdelim(&readBuffer, &length, 10, accountfd);
 			}
 			fclose(accountfd);
 			accountfd = fopen(accountFile, "w");
@@ -608,6 +611,22 @@ void *login(void *vargp){
 									strcat(passSend, pass);
 									strcat(passSend, ENDVERB);
 
+									/* HASHING */
+									unsigned char hash[SHA256_DIGEST_LENGTH];
+									SHA256_CTX sha256;
+									SHA256_Init(&sha256);
+									SHA256_Update(&sha256, passWord, strlen(passWord));
+									SHA256_Final(hash, &sha256);
+
+									char outputBuffer[65];
+									int i = 0;
+									for(; i < SHA256_DIGEST_LENGTH; i++){
+										sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+									}
+									outputBuffer[64] = 0;
+
+									testPrint(outputBuffer);
+
 									/* Test if password meets criteria */
 									bool valid = validPassword(passWord);
 
@@ -661,7 +680,7 @@ void *login(void *vargp){
 										strcat(message, motd);
 										strcat(message, ENDVERB);
 
-										write(connfd, message, strlen(motd));
+										write(connfd, message, strlen(message));
 										write(connfd, "\n\n", 2);
 										usersConnected++;
 										accountsInFile++;
@@ -1074,7 +1093,9 @@ void users(){
 
 void accounts(){
 	if(!accountsInFile){
-		printf("%sNo accounts available.\n", NORMAL_TEXT);
+		write(1, NORMAL_TEXT, strlen(NORMAL_TEXT));
+		char string[] = "No accounts available.\n";
+		write(1, string, strlen(string));
 	} else {
 		AuserCursor = AHEAD;
 		int i = 0;
@@ -1082,8 +1103,7 @@ void accounts(){
 
 		while(AuserCursor->next != 0){
 			AuserCursor = AuserCursor->next;
-
-			printf("%s%d:	%s", NORMAL_TEXT, ++i, AuserCursor->name);
+			printf("%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
 		}
 	}
 }
@@ -1145,6 +1165,9 @@ int sd(){
 		}
 	}
 	free(AHEAD);
+	if(commRun){
+		pthread_cancel(commT);
+	}
 	return EXIT_SUCCESS;
 }
 
