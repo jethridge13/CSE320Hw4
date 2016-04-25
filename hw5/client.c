@@ -97,14 +97,51 @@ int main(int argc, char** argv){
         return EXIT_FAILURE;
     }
 
+    char output[MAX_LINE];
+
+    /*LOG IN*/
+    write(sockfd, "WOLFIE \r\n\r\n\0", 12);
+    if(verbose){
+        char wolfieSent[] = "WOLFIE sent\n";
+        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+        write(1, wolfieSent, strlen(wolfieSent));
+    }
+    memset(output, 0, sizeof(output));
+    read(sockfd, output, MAX_LINE);
+    if(strstr(output, "EIFLOW ") == output && verbose) {
+        char eiflowReceived[] = "EIFLOW received\n";
+        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+        write(1, eiflowReceived, strlen(eiflowReceived));
+    }
+    memset(output, 0, sizeof(output));
+    strcat(output, "IAM ");
+    strcat(output, name);
+    strcat(output, " \r\n\r\n\0");
+    write(sockfd, output, strlen(output));
+    if(verbose){
+        char wolfieSent[] = "IAM sent\n";
+        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+        write(1, wolfieSent, strlen(wolfieSent));
+    }
+    memset(output, 0, sizeof(output));
+    read(sockfd, output, MAX_LINE);
+    if(strstr(output, "HI ") == output && verbose) {
+        char hiReceived[] = "HI received\n";
+        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+        write(1, hiReceived, strlen(hiReceived));
+    }
+
+    /*MULTIPLEX*/
     int selectRet = 0;
     int stdinReady = 0;
     int listenReady = 0;
-    char output[MAX_LINE];
     fd_set fdRead;
 
     int timeInt, hours, minutes, seconds = 0;
-    char* usertoken;
+    char* token;
+    char* toPtr;
+    char* fromPtr;
+    char* msgPtr;
 
     while(true){
         FD_ZERO(&fdRead);
@@ -122,7 +159,7 @@ int main(int argc, char** argv){
 
         /* Handle connection */
         if(listenReady) {
-            memset(&output, 0, sizeof(output));
+            memset(output, 0, sizeof(output));
             read(sockfd, output, MAX_LINE);
             if(strstr(output, "EMIT ") == output) {
                 if(verbose){
@@ -144,6 +181,7 @@ int main(int argc, char** argv){
                     write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
                     write(1, byeReceived, strlen(byeReceived));
                 }
+                close(sockfd);
                 return EXIT_SUCCESS;
             }
             else if(strstr(output, "UTSIL ") == output) {
@@ -153,82 +191,130 @@ int main(int argc, char** argv){
                     write(1, utsilReceived, strlen(utsilReceived));
                 }
                 strtok(output, " \r\n");
-                usertoken = strtok(NULL, " \r\n");
-                while(usertoken != NULL) {
-                    printf("%s\n", usertoken);
-                    usertoken = strtok(NULL, " \r\n");
+                token = strtok(NULL, " \r\n");
+                while(token != NULL) {
+                    printf("%s\n", token);
+                    token = strtok(NULL, " \r\n");
+                }
+            }
+            else if(strstr(output, "MSG ") == output) {
+                if(verbose){
+                    char msgReceived[] = "MSG received\n";
+                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                    write(1, msgReceived, strlen(msgReceived));
+                }
+                strtok(output, " \r\n");
+                token = strtok(NULL, " \r\n");
+                toPtr = token;
+                token = strtok(NULL, " \r\n");
+                fromPtr = token;
+                token = strtok(NULL, "\r\n");
+                msgPtr = token;
+                if(!strcmp(toPtr, name)) {
+                    write(1, "> ", 2);
+                    write(1, msgPtr, strlen(msgPtr));
+                    write(1, "\n", 2);
+                }
+                else if(!strcmp(fromPtr, name)) {
+                    write(1, "< ", 2);
+                    write(1, msgPtr, strlen(msgPtr));
+                    write(1, "\n", 2);
                 }
             }
             else {
-                if(strstr(output, "EIFLOW ") == output && verbose) {
-                    char eiflowReceived[] = "EIFLOW received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, eiflowReceived, strlen(eiflowReceived));
-                }
-                if(strstr(output, "HI ") == output && verbose) {
-                    char hiReceived[] = "HI received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, hiReceived, strlen(hiReceived));
-                }
-                write(1, output, sizeof(output));
+                write(1, output, strlen(output));
             }
         }
 
         /* Handle STDIN */
         if(stdinReady) {
             if(fgets(input, MAX_LINE - 6, stdin) != NULL) {
-                if(*input == '/') {
-                    if(!strcmp(input, "/time\n")) {
-                        if(verbose){
-                            char timeSent[] = "TIME sent\n";
-                            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                            write(1, timeSent, strlen(timeSent));
-                        }
-                        write(sockfd, "TIME \r\n\r\n\0", 10);
-                    }
-                    else if(!strcmp(input, "/help\n")) {
-                        printf(
-                            "CLIENT COMMANDS:\n"
-                            "/time          Displays how long the client has been connected to server.\n"
-                            "/help          Lists all client commands. The thing you just typed in.\n"
-                            "/logout        Disconnects client from server.\n"
-                            "/listu         Lists all clients connected to server.\n");
-                    }
-                    else if(!strcmp(input, "/logout\n")) {
-                        if(verbose){
-                            char byeSent[] = "BYE sent\n";
-                            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                            write(1, byeSent, strlen(byeSent));
-                        }
-                        write(sockfd, "BYE \r\n\r\n\0", 9);
-                    }
-                    else if(!strcmp(input, "/listu\n")) {
-                        if(verbose){
-                            char listuSent[] = "LISTU sent\n";
-                            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                            write(1, listuSent, strlen(listuSent));
-                        }
-                        write(sockfd, "LISTU \r\n\r\n\0", 11);
-                    }
-                    else
-                        printf("%s\n", "Invalid command. Enter /help for a list of commands.");
-                }
-                else {
+                if(*input == '\n')
+                    continue;
+                if(!strcmp(input, "/time\n")) {
                     if(verbose){
-                        if(!strcmp(input, "WOLFIE\n")) {
-                            char wolfieSent[] = "WOLFIE sent\n";
-                            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                            write(1, wolfieSent, strlen(wolfieSent));
-                        }
-                        if(strstr(input, "IAM") != NULL) {
-                            char iamSent[] = "IAM sent\n";
-                            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                            write(1, iamSent, strlen(iamSent));
+                        char timeSent[] = "TIME sent\n";
+                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                        write(1, timeSent, strlen(timeSent));
+                    }
+                    write(sockfd, "TIME \r\n\r\n\0", 10);
+                }
+                else if(!strcmp(input, "/help\n")) {
+                    printf(
+                        "CLIENT COMMANDS:\n"
+                        "/time          Displays how long the client has been connected to server.\n"
+                        "/help          Lists all client commands. The thing you just typed in.\n"
+                        "/logout        Disconnects client from server.\n"
+                        "/listu         Lists all clients connected to server.\n"
+                        "/chat <TO> <MESSAGE>         Starts chat.\n");
+                }
+                else if(!strcmp(input, "/logout\n")) {
+                    if(verbose){
+                        char byeSent[] = "BYE sent\n";
+                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                        write(1, byeSent, strlen(byeSent));
+                    }
+                    write(sockfd, "BYE \r\n\r\n\0", 9);
+                }
+                else if(!strcmp(input, "/listu\n")) {
+                    if(verbose){
+                        char listuSent[] = "LISTU sent\n";
+                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                        write(1, listuSent, strlen(listuSent));
+                    }
+                    write(sockfd, "LISTU \r\n\r\n\0", 11);
+                }
+                else if(strstr(input, "/chat") == input) {
+                    strtok(input, " \r\n");
+                    token = strtok(NULL, " \r\n");
+                    if(token != NULL)
+                        toPtr = token;
+                    else {
+                        printf("Invalid chat format. Enter /help for a list of commands.\n");
+                        fflush(stdout);
+                        continue;
+    
+                    }
+                    token = strtok(NULL, "\r\n");
+                    if(token != NULL)
+                        msgPtr = token;
+                    else {
+                        printf("Invalid chat format. Enter /help for a list of commands.\n");
+                        fflush(stdout);
+                        continue;
+                    }
+                    if(verbose){
+                        char listuSent[] = "MSG sent\n";
+                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                        write(1, listuSent, strlen(listuSent));
+                    }
+                    write(sockfd, "MSG ", 4);
+                    write(sockfd, toPtr, strlen(toPtr));
+                    write(sockfd, " ", 1);
+                    write(sockfd, name, strlen(name));
+                    write(sockfd, " ", 1);
+                    write(sockfd, msgPtr, strlen(msgPtr));
+                    write(sockfd, " \r\n\r\n\0", 6);
+
+                    /*FORK*/
+                    pid_t childID = fork();
+                    if(childID == 0){
+                        char* xterm[] = {"xterm", "-geometry", "45x35+100", "-T", toPtr, "-e", "./chat", NULL};
+                        int status = execv("/usr/bin/xterm", xterm);
+
+                        if(status){
+                            char* statusLine = "Couldn't create chat window!\n";
+                            write(1, statusLine, strlen(statusLine));
+                            kill(getpid(), SIGKILL);
                         }
                     }
-                    strcat(input, " \r\n\r\n\0");
-                    write(sockfd, input, strlen(input)+1);
                 }
+                else
+                    printf("%s\n", "Invalid command. Enter /help for a list of commands.");
+            }
+            else {
+                strcat(input, " \r\n\r\n\0");
+                write(sockfd, input, strlen(input)+1);
             }
         }
 
