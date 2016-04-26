@@ -1174,8 +1174,8 @@ int sd(){
 			write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
 			write(fileno(accountfd), "\t", 1);
 			write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
-			write(fileno(accountfd), "\t", 1);
-			write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
+			//write(fileno(accountfd), "\t", 1);
+			//write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
 			write(fileno(accountfd), "\n", 1);
 			while(AuserCursor->next != 0){
 				AuserCursor = AuserCursor->next;
@@ -1183,8 +1183,8 @@ int sd(){
 				write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
 				write(fileno(accountfd), "\t", 1);
 				write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
-				write(fileno(accountfd), "\t", 1);
-				write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
+				//write(fileno(accountfd), "\t", 1);
+				//write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
 				write(fileno(accountfd), "\n", 1);
 			}
 		}
