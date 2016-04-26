@@ -10,6 +10,7 @@
 void usage();
 
 bool verbose = false;
+bool chatOpen = false;
 
 
 void testPrint(char* string){
@@ -281,6 +282,14 @@ int main(int argc, char** argv){
     char* fromPtr;
     char* msgPtr;
 
+    int sv[2]; //SOCKETPAIR FD
+    int chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+
+    if(chatfd < 0){
+        printf("%sError creating socket.\n", ERROR_TEXT);
+        return EXIT_FAILURE;
+    }
+
     while(true){
         FD_ZERO(&fdRead);
         FD_SET(fileno(stdin), &fdRead);
@@ -350,41 +359,37 @@ int main(int argc, char** argv){
                 token = strtok(NULL, " \r\n");
                 fromPtr = token;
 
-                int sv[2]; //SOCKETPAIR FD
-                int chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+                if(chatOpen == false) {
+                    pid_t childID = fork();
+                    if(childID == 0){
+                        close(sv[0]);
 
-                if(chatfd < 0){
-                    printf("%sError creating socket.\n", ERROR_TEXT);
-                    return EXIT_FAILURE;
-                }
+                        char fdStr[12];
+                        snprintf(fdStr, 12, "%i", sv[1]);
+                        printf("%s", fdStr);
 
-                pid_t childID = fork();
-                if(childID == 0){
-                    close(sv[0]);
+                        int status = 1;
 
-                    char fdStr[12];
-                    snprintf(fdStr, 12, "%i", sv[1]);
-                    printf("%s", fdStr);
+                        if(!strcmp(fromPtr, name)) {
+                            char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, fromPtr, toPtr, NULL};
+                            status = execv("/usr/bin/xterm", xterm);
+                        }
+                        else {
+                            char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, toPtr, fromPtr, NULL};
+                            status = execv("/usr/bin/xterm", xterm);
+                        }
 
-                    int status = 1;
-
-                    if(!strcmp(fromPtr, name)) {
-                        char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, fromPtr, toPtr, NULL};
-                        status = execv("/usr/bin/xterm", xterm);
+                        if(status){
+                            char* statusLine = "Couldn't create chat window!\n";
+                            write(1, statusLine, strlen(statusLine));
+                            kill(getpid(), SIGKILL);
+                        }
+                        chatOpen = true;
                     }
                     else {
-                        char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, toPtr, fromPtr, NULL};
-                        status = execv("/usr/bin/xterm", xterm);
+                        close(sv[1]);
+                        chatOpen = true;
                     }
-
-                    if(status){
-                        char* statusLine = "Couldn't create chat window!\n";
-                        write(1, statusLine, strlen(statusLine));
-                        kill(getpid(), SIGKILL);
-                    }
-                }
-                else {
-                    close(sv[1]);
                 }
                 write(sv[0], outputCpy, strlen(outputCpy));
             }
