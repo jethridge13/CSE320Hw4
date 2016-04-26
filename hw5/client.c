@@ -257,6 +257,16 @@ int main(int argc, char** argv){
                 write(1, output + 9, strlen(output - 9));
             return EXIT_FAILURE;
         }
+        char* motdPtr = strstr(output, "MOTD ");
+        while(motdPtr == NULL){
+            memset(output, 0, sizeof(output));
+            read(sockfd, output, MAX_LINE);
+            motdPtr = strstr(output, "MOTD ");
+        }
+        motdPtr += 5;
+        strtok(motdPtr, "\r\n");
+        write(1, motdPtr, strlen(motdPtr));
+        write(1, "\n", 1);
     }
 
     /*MULTIPLEX*/
