@@ -183,9 +183,16 @@ int main(int argc, char** argv){
         read(sockfd, output, MAX_LINE);
         char loginSuccess[] = "\nLogged in! Message of the Day:\n";
         write(1, loginSuccess, strlen(loginSuccess));
-        char* motdPtr = strstr(output, "MOTD ") + 5;
+        char* motdPtr = strstr(output, "MOTD ");
+        while(motdPtr == NULL){
+            memset(output, 0, sizeof(output));
+            read(sockfd, output, MAX_LINE);
+            motdPtr = strstr(output, "MOTD ");
+        }
+        motdPtr += 5;
         strtok(motdPtr, "\r\n");
         write(1, motdPtr, strlen(motdPtr));
+        write(1, "\n", 1);
     }
 
     /*ELSE LOG IN*/

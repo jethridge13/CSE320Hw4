@@ -668,10 +668,11 @@ void *login(void *vargp){
 										}
 
 										char hi[] = "HI ";
-										char hiSend[strlen(name) + strlen(hi) + 6];
+										char hiSend[strlen(name) + strlen(hi) + strlen(ENDVERB) + 1];
 										strcpy(hiSend, hi);
 										strcat(hiSend, name);
 										strcat(hiSend, ENDVERB);
+										strcat(hiSend, "\0");
 
 										/* Initialize user */
 										if(usersConnected){
