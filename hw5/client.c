@@ -98,6 +98,7 @@ int main(int argc, char** argv){
     }
 
     char output[MAX_LINE];
+    char loginError[] = "Error logging in! Exiting.\n";
 
     /*LOG IN*/
     write(sockfd, "WOLFIE \r\n\r\n\0", 12);
@@ -113,22 +114,136 @@ int main(int argc, char** argv){
         write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
         write(1, eiflowReceived, strlen(eiflowReceived));
     }
-    memset(output, 0, sizeof(output));
-    strcat(output, "IAM ");
-    strcat(output, name);
-    strcat(output, " \r\n\r\n\0");
-    write(sockfd, output, strlen(output));
-    if(verbose){
-        char wolfieSent[] = "IAM sent\n";
-        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-        write(1, wolfieSent, strlen(wolfieSent));
+    if(strstr(output, "EIFLOW ") != output) {
+        write(1, loginError, strlen(loginError));
+        return EXIT_FAILURE;
     }
-    memset(output, 0, sizeof(output));
-    read(sockfd, output, MAX_LINE);
-    if(strstr(output, "HI ") == output && verbose) {
-        char hiReceived[] = "HI received\n";
-        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-        write(1, hiReceived, strlen(hiReceived));
+    /*CREATE NEW USER*/
+    if(createUser) {
+        memset(output, 0, sizeof(output));
+        strcat(output, "IAMNEW ");
+        strcat(output, name);
+        strcat(output, " \r\n\r\n\0");
+        write(sockfd, output, strlen(output));
+        if(verbose){
+            char iamnewSent[] = "IAMNEW sent\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, iamnewSent, strlen(iamnewSent));
+        }
+
+        memset(output, 0, sizeof(output));
+        read(sockfd, output, MAX_LINE);
+        if(strstr(output, "HINEW ") == output && verbose) {
+            char hinewReceived[] = "HINEW received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, hinewReceived, strlen(hinewReceived));
+        }
+        if(strstr(output, "HINEW ") != output) {
+            char accExists[] = "Account with username already exists or already logged in!\n";
+            write(1, accExists, strlen(accExists));
+            if(verbose)
+                write(1, output, strlen(output));
+            return EXIT_FAILURE;
+        }
+
+        char createPass[] = "Create a password (Must be min 5 char, 1 uppercase, 1 symbol, 1 number):\n";
+        write(1, createPass, strlen(createPass));
+
+        char pass[MAX_LINE - 20];
+        fgets(pass, MAX_LINE - 26, stdin);
+        memset(output, 0, sizeof(output));
+        strcat(output, "NEWPASS ");
+        strcat(output, pass);
+        strcat(output, " \r\n\r\n\0");
+        write(sockfd, output, strlen(output));
+        if(verbose){
+            char newpassSent[] = "NEWPASS sent\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, newpassSent, strlen(newpassSent));
+        }
+
+        memset(output, 0, sizeof(output));
+        read(sockfd, output, MAX_LINE);
+        if(strstr(output, "SSAPWEN ") == output && verbose) {
+            char ssapwenReceived[] = "SSAPWEN received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, ssapwenReceived, strlen(ssapwenReceived));
+            char hiReceived[] = "HI received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, hiReceived, strlen(hiReceived));
+        }
+        if(strstr(output, "SSAPWEN ") != output) {
+            char badPass[] = "Improper password!\n";
+            write(1, badPass, strlen(badPass));
+            if(verbose)
+                write(1, output + 12, strlen(output - 12));
+            return EXIT_FAILURE;
+        }
+        printf("\nLogged in! Message of the Day:\n%s", (strstr(output, "MOTD ")) + 5);
+    }
+
+    /*ELSE LOG IN*/
+    else {
+        memset(output, 0, sizeof(output));
+        strcat(output, "IAM ");
+        strcat(output, name);
+        strcat(output, " \r\n\r\n\0");
+        write(sockfd, output, strlen(output));
+        if(verbose){
+            char iamSent[] = "IAM sent\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, iamSent, strlen(iamSent));
+        }
+
+        memset(output, 0, sizeof(output));
+        read(sockfd, output, MAX_LINE);
+        if(strstr(output, "AUTH ") == output && verbose) {
+            char authReceived[] = "AUTH received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, authReceived, strlen(authReceived));
+        }
+        if(strstr(output, "AUTH ") != output) {
+            char noUser[] = "Account with username doesn't exist or already logged in!\n";
+            write(1, noUser, strlen(noUser));
+            if(verbose)
+                write(1, output, strlen(output));
+            return EXIT_FAILURE;
+        }
+
+        char enterPass[] = "Enter password: ";
+        write(1, enterPass, strlen(enterPass));
+
+        char pass[MAX_LINE - 20];
+        fgets(pass, MAX_LINE - 26, stdin);
+        memset(output, 0, sizeof(output));
+        strcat(output, "PASS ");
+        strcat(output, pass);
+        strcat(output, " \r\n\r\n\0");
+        write(sockfd, output, strlen(output));
+        if(verbose){
+            char newpassSent[] = "PASS sent\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, newpassSent, strlen(newpassSent));
+        }
+
+        memset(output, 0, sizeof(output));
+        read(sockfd, output, MAX_LINE);
+        if(strstr(output, "SSAP ") == output && verbose) {
+            char ssapReceived[] = "SSAP received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, ssapReceived, strlen(ssapReceived));
+            char hiReceived[] = "HI received\n";
+            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+            write(1, hiReceived, strlen(hiReceived));
+            write(1, output, strlen(output));
+        }
+        if(strstr(output, "SSAP ") != output) {
+            char badPass[] = "Failed to log in!\n";
+            write(1, badPass, strlen(badPass));
+            if(verbose)
+                write(1, output + 9, strlen(output - 9));
+            return EXIT_FAILURE;
+        }
     }
 
     /*MULTIPLEX*/
@@ -203,23 +318,52 @@ int main(int argc, char** argv){
                     write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
                     write(1, msgReceived, strlen(msgReceived));
                 }
+
+                char outputCpy[strlen(output) + 1];
+                strcpy(outputCpy, output);
                 strtok(output, " \r\n");
                 token = strtok(NULL, " \r\n");
                 toPtr = token;
                 token = strtok(NULL, " \r\n");
                 fromPtr = token;
-                token = strtok(NULL, "\r\n");
-                msgPtr = token;
-                if(!strcmp(toPtr, name)) {
-                    write(1, "> ", 2);
-                    write(1, msgPtr, strlen(msgPtr));
-                    write(1, "\n", 2);
+
+                int sv[2]; //SOCKETPAIR FD
+                int chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+
+                if(chatfd < 0){
+                    printf("%sError creating socket.\n", ERROR_TEXT);
+                    return EXIT_FAILURE;
                 }
-                else if(!strcmp(fromPtr, name)) {
-                    write(1, "< ", 2);
-                    write(1, msgPtr, strlen(msgPtr));
-                    write(1, "\n", 2);
+
+                pid_t childID = fork();
+                if(childID == 0){
+                    close(sv[0]);
+
+                    char fdStr[12];
+                    snprintf(fdStr, 12, "%i", sv[1]);
+                    printf("%s", fdStr);
+
+                    int status = 1;
+
+                    if(!strcmp(fromPtr, name)) {
+                        char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, fromPtr, toPtr, NULL};
+                        status = execv("/usr/bin/xterm", xterm);
+                    }
+                    else {
+                        char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, toPtr, fromPtr, NULL};
+                        status = execv("/usr/bin/xterm", xterm);
+                    }
+
+                    if(status){
+                        char* statusLine = "Couldn't create chat window!\n";
+                        write(1, statusLine, strlen(statusLine));
+                        kill(getpid(), SIGKILL);
+                    }
                 }
+                else {
+                    close(sv[1]);
+                }
+                write(sv[0], outputCpy, strlen(outputCpy));
             }
             else {
                 write(1, output, strlen(output));
@@ -295,19 +439,6 @@ int main(int argc, char** argv){
                     write(sockfd, " ", 1);
                     write(sockfd, msgPtr, strlen(msgPtr));
                     write(sockfd, " \r\n\r\n\0", 6);
-
-                    /*FORK*/
-                    pid_t childID = fork();
-                    if(childID == 0){
-                        char* xterm[] = {"xterm", "-geometry", "45x35+100", "-T", toPtr, "-e", "./chat", NULL};
-                        int status = execv("/usr/bin/xterm", xterm);
-
-                        if(status){
-                            char* statusLine = "Couldn't create chat window!\n";
-                            write(1, statusLine, strlen(statusLine));
-                            kill(getpid(), SIGKILL);
-                        }
-                    }
                 }
                 else
                     printf("%s\n", "Invalid command. Enter /help for a list of commands.");
