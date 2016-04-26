@@ -63,7 +63,8 @@ struct user {
 
 struct account {
 	char name[80];
-	char pwd[80];
+	char pwd[65];
+	unsigned char salt[5];
 	struct account *next;
 	struct account *prev;
 };
@@ -474,7 +475,27 @@ void *login(void *vargp){
 								strcat(passSend, pwd);
 								strcat(passSend, ENDVERB);
 
-								if(!strcmp(password, AuserCursor->pwd)){
+								unsigned char salt[5];
+								strcpy((char*)salt, (char*)AuserCursor->salt);
+
+								char passwordHash[strlen(password) + 5];
+								strcpy(passwordHash, password);
+								//strcat(passwordHash, (char*) salt);
+
+								unsigned char hash[SHA256_DIGEST_LENGTH];
+								SHA256_CTX sha256;
+								SHA256_Init(&sha256);
+								SHA256_Update(&sha256, password, strlen(password));
+								SHA256_Final(hash, &sha256);
+
+								char outputBuffer[65];
+								int i = 0;
+								for(; i < SHA256_DIGEST_LENGTH; i++){
+									sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+								}
+								outputBuffer[64] = 0;
+
+								if(!strcmp(outputBuffer, AuserCursor->pwd)){
 									passwordMatch = true;
 									write(connfd, passSend, strlen(passSend));
 								}
@@ -548,7 +569,7 @@ void *login(void *vargp){
 						strcpy(hiSend, hi);
 						strcat(hiSend, name);
 						strcat(hiSend, ENDVERB);
-						/* hiSend now containts HINEW <name> <ENDVERB> */
+						/* hiSend now contains HINEW <name> <ENDVERB> */
 
 						bool notDuplicate = true;
 
@@ -611,6 +632,17 @@ void *login(void *vargp){
 									strcat(passSend, pass);
 									strcat(passSend, ENDVERB);
 
+									/* LET'S ADD SOME SALT BEFORE WE HASH */
+									unsigned char salt[5];
+									RAND_bytes(salt, 5);
+
+									char passwordHash[strlen(passWord) + 5];
+									strcpy(passwordHash, passWord);
+									//strcat(passwordHash, (char*)salt);
+									/*
+									testPrint((char*)salt);
+									testPrint(passwordHash);
+									*/
 									/* HASHING */
 									unsigned char hash[SHA256_DIGEST_LENGTH];
 									SHA256_CTX sha256;
@@ -624,8 +656,6 @@ void *login(void *vargp){
 										sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
 									}
 									outputBuffer[64] = 0;
-
-									testPrint(outputBuffer);
 
 									/* Test if password meets criteria */
 									bool valid = validPassword(passWord);
@@ -666,7 +696,8 @@ void *login(void *vargp){
 										
 										strncpy(AuserCursor->name, userName, 80);
 										AuserCursor->next = 0;
-										strncpy(AuserCursor->pwd, passWord, 80);
+										strncpy(AuserCursor->pwd, outputBuffer, 65);
+										strncpy((char*)(AuserCursor->salt), (char*)salt, 5);
 
 										write(connfd, hiSend, strlen(hiSend));
 										if(verbose){
@@ -1142,6 +1173,8 @@ int sd(){
 			write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
 			write(fileno(accountfd), "\t", 1);
 			write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
+			write(fileno(accountfd), "\t", 1);
+			write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
 			write(fileno(accountfd), "\n", 1);
 			while(AuserCursor->next != 0){
 				AuserCursor = AuserCursor->next;
@@ -1149,6 +1182,8 @@ int sd(){
 				write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
 				write(fileno(accountfd), "\t", 1);
 				write(fileno(accountfd), AuserCursor->pwd, strlen(AuserCursor->pwd));
+				write(fileno(accountfd), "\t", 1);
+				write(fileno(accountfd), AuserCursor->salt, strlen((char*)AuserCursor->salt));
 				write(fileno(accountfd), "\n", 1);
 			}
 		}
