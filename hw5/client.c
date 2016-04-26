@@ -179,7 +179,13 @@ int main(int argc, char** argv){
                 write(1, output + 12, strlen(output - 12));
             return EXIT_FAILURE;
         }
-        printf("\nLogged in! Message of the Day:\n%s", (strstr(output, "MOTD ")) + 5);
+        memset(output, 0, sizeof(output));
+        read(sockfd, output, MAX_LINE);
+        char loginSuccess[] = "\nLogged in! Message of the Day:\n";
+        write(1, loginSuccess, strlen(loginSuccess));
+        char* motdPtr = strstr(output, "MOTD ") + 5;
+        strtok(motdPtr, "\r\n");
+        write(1, motdPtr, strlen(motdPtr));
     }
 
     /*ELSE LOG IN*/
