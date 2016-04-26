@@ -11,6 +11,7 @@ void usage();
 
 bool verbose = false;
 bool chatOpen = false;
+pid_t childID;
 
 
 void testPrint(char* string){
@@ -329,6 +330,7 @@ int main(int argc, char** argv){
                     write(1, byeReceived, strlen(byeReceived));
                 }
                 close(sockfd);
+                kill(childID, SIGKILL);
                 return EXIT_SUCCESS;
             }
             else if(strstr(output, "UTSIL ") == output) {
@@ -360,7 +362,7 @@ int main(int argc, char** argv){
                 fromPtr = token;
 
                 if(chatOpen == false) {
-                    pid_t childID = fork();
+                    childID = fork();
                     if(childID == 0){
                         close(sv[0]);
 
