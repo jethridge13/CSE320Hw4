@@ -1,0 +1,230 @@
+==78361== Memcheck, a memory error detector
+==78361== Copyright (C) 2002-2015, and GNU GPL'd, by Julian Seward et al.
+==78361== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
+==78361== Command: ./server -v 6660 Hey accounts.txt
+==78361== Parent PID: 43167
+==78361== 
+--78361-- 
+--78361-- Valgrind options:
+--78361--    --leak-check=full
+--78361--    --log-file=logfile.out
+--78361--    -v
+--78361-- Contents of /proc/version:
+--78361--   Linux version 4.2.0-27-generic (buildd@lgw01-12) (gcc version 5.2.1 20151010 (Ubuntu 5.2.1-22ubuntu2) ) #32-Ubuntu SMP Fri Jan 22 04:49:08 UTC 2016
+--78361-- 
+--78361-- Arch and hwcaps: AMD64, LittleEndian, amd64-cx16-lzcnt-rdtscp-sse3-avx-avx2-bmi
+--78361-- Page sizes: currently 4096, max supported 4096
+--78361-- Valgrind library directory: /usr/lib/valgrind
+--78361-- Reading syms from /home/jethridge/DeepFriedIguana/hw5/server
+--78361-- Reading syms from /lib/x86_64-linux-gnu/ld-2.21.so
+--78361--   Considering /lib/x86_64-linux-gnu/ld-2.21.so ..
+--78361--   .. CRC mismatch (computed 9395ff2d wanted 2e4c1d87)
+--78361--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/ld-2.21.so ..
+--78361--   .. CRC is valid
+--78361-- Reading syms from /usr/lib/valgrind/memcheck-amd64-linux
+--78361--   Considering /usr/lib/valgrind/memcheck-amd64-linux ..
+--78361--   .. CRC mismatch (computed cd34a87b wanted 936d30dc)
+--78361--    object doesn't have a symbol table
+--78361--    object doesn't have a dynamic symbol table
+--78361-- Scheduler: using generic scheduler lock implementation.
+--78361-- Reading suppressions file: /usr/lib/valgrind/default.supp
+==78361== embedded gdbserver: reading from /tmp/vgdb-pipe-from-vgdb-to-78361-by-jethridge-on-???
+==78361== embedded gdbserver: writing to   /tmp/vgdb-pipe-to-vgdb-from-78361-by-jethridge-on-???
+==78361== embedded gdbserver: shared mem   /tmp/vgdb-pipe-shared-mem-vgdb-78361-by-jethridge-on-???
+==78361== 
+==78361== TO CONTROL THIS PROCESS USING vgdb (which you probably
+==78361== don't want to do, unless you know exactly what you're doing,
+==78361== or are doing some strange experiment):
+==78361==   /usr/lib/valgrind/../../bin/vgdb --pid=78361 ...command...
+==78361== 
+==78361== TO DEBUG THIS PROCESS USING GDB: start GDB like this
+==78361==   /path/to/gdb ./server
+==78361== and then give GDB the following command
+==78361==   target remote | /usr/lib/valgrind/../../bin/vgdb --pid=78361
+==78361== --pid is optional if only one valgrind process is running
+==78361== 
+--78361-- REDIR: 0x401ad80 (ld-linux-x86-64.so.2:strlen) redirected to 0x3809e1b1 (???)
+--78361-- Reading syms from /usr/lib/valgrind/vgpreload_core-amd64-linux.so
+--78361--   Considering /usr/lib/valgrind/vgpreload_core-amd64-linux.so ..
+--78361--   .. CRC mismatch (computed 1c3ef3cc wanted d1ae2653)
+--78361--    object doesn't have a symbol table
+--78361-- Reading syms from /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so
+--78361--   Considering /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so ..
+--78361--   .. CRC mismatch (computed 6e6e6f70 wanted ea7b69f1)
+--78361--    object doesn't have a symbol table
+==78361== WARNING: new redirection conflicts with existing -- ignoring it
+--78361--     old: 0x0401ad80 (strlen              ) R-> (0000.0) 0x3809e1b1 ???
+--78361--     new: 0x0401ad80 (strlen              ) R-> (2007.0) 0x04c2f060 strlen
+--78361-- REDIR: 0x401aae0 (ld-linux-x86-64.so.2:index) redirected to 0x4c2ec00 (index)
+--78361-- REDIR: 0x401ad00 (ld-linux-x86-64.so.2:strcmp) redirected to 0x4c30110 (strcmp)
+--78361-- REDIR: 0x401ba70 (ld-linux-x86-64.so.2:mempcpy) redirected to 0x4c33330 (mempcpy)
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libcrypto.so.1.0.0
+--78361--    object doesn't have a symbol table
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libpthread-2.21.so
+--78361--   Considering /lib/x86_64-linux-gnu/libpthread-2.21.so ..
+--78361--   .. CRC mismatch (computed 80ba9285 wanted b8f3eaa1)
+--78361--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/libpthread-2.21.so ..
+--78361--   .. CRC is valid
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libc-2.21.so
+--78361--   Considering /lib/x86_64-linux-gnu/libc-2.21.so ..
+--78361--   .. CRC mismatch (computed 9362f137 wanted 040e4cfb)
+--78361--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/libc-2.21.so ..
+--78361--   .. CRC is valid
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libdl-2.21.so
+--78361--   Considering /lib/x86_64-linux-gnu/libdl-2.21.so ..
+--78361--   .. CRC mismatch (computed f2021204 wanted cbdb96f3)
+--78361--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/libdl-2.21.so ..
+--78361--   .. CRC is valid
+--78361-- REDIR: 0x55299b0 (libc.so.6:strcasecmp) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x552bca0 (libc.so.6:strncasecmp) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x5529130 (libc.so.6:memcpy@GLIBC_2.2.5) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x5523c70 (libc.so.6:strcmp) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x55273d0 (libc.so.6:rindex) redirected to 0x4c2e8e0 (rindex)
+--78361-- REDIR: 0x55256d0 (libc.so.6:strlen) redirected to 0x4c2efa0 (strlen)
+--78361-- REDIR: 0x5523a50 (libc.so.6:__GI_strchr) redirected to 0x4c2ea40 (__GI_strchr)
+--78361-- REDIR: 0x551e4a0 (libc.so.6:malloc) redirected to 0x4c2bb60 (malloc)
+--78361-- REDIR: 0x5528010 (libc.so.6:__GI_strstr) redirected to 0x4c33590 (__strstr_sse2)
+--78361-- REDIR: 0x551e850 (libc.so.6:free) redirected to 0x4c2cdc0 (free)
+--78361-- REDIR: 0x5530710 (libc.so.6:strchrnul) redirected to 0x4c32e60 (strchrnul)
+--78361-- REDIR: 0x5529360 (libc.so.6:__GI_mempcpy) redirected to 0x4c33060 (__GI_mempcpy)
+--78361-- REDIR: 0x5528820 (libc.so.6:memchr) redirected to 0x4c301b0 (memchr)
+--78361-- REDIR: 0x552e3f0 (libc.so.6:__GI_memcpy) redirected to 0x4c30b60 (__GI_memcpy)
+--78361-- REDIR: 0x5539ca0 (libc.so.6:__strcmp_sse2_unaligned) redirected to 0x4c2ffd0 (strcmp)
+--78361-- REDIR: 0x5525b40 (libc.so.6:__GI_strncmp) redirected to 0x4c2f750 (__GI_strncmp)
+--78361-- REDIR: 0x55e5840 (libc.so.6:__strncasecmp_avx) redirected to 0x4c2f980 (strncasecmp)
+--78361-- REDIR: 0x5523cb0 (libc.so.6:__GI_strcmp) redirected to 0x4c30020 (__GI_strcmp)
+--78361-- REDIR: 0x5529840 (libc.so.6:__GI_stpcpy) redirected to 0x4c31fe0 (__GI_stpcpy)
+--78361-- REDIR: 0x551efe0 (libc.so.6:calloc) redirected to 0x4c2dae0 (calloc)
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libnss_files-2.21.so
+--78361--   Considering /lib/x86_64-linux-gnu/libnss_files-2.21.so ..
+--78361--   .. CRC mismatch (computed 94cc47b9 wanted b6ba00c0)
+--78361--   Considering /usr/lib/debug/lib/x86_64-linux-gnu/libnss_files-2.21.so ..
+--78361--   .. CRC is valid
+--78361-- REDIR: 0x5525140 (libc.so.6:__GI_strcpy) redirected to 0x4c2f150 (__GI_strcpy)
+--78361-- REDIR: 0x5539b80 (libc.so.6:__GI_strncpy) redirected to 0x4c2f350 (__GI_strncpy)
+--78361-- REDIR: 0x5530500 (libc.so.6:rawmemchr) redirected to 0x4c32e90 (rawmemchr)
+--78361-- REDIR: 0x5528b70 (libc.so.6:bcmp) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x5607c80 (libc.so.6:__memcmp_sse4_1) redirected to 0x4c31d30 (__memcmp_sse4_1)
+--78361-- REDIR: 0x55285e0 (libc.so.6:strstr) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x55431b0 (libc.so.6:__strstr_sse2_unaligned) redirected to 0x4c33520 (strstr)
+--78361-- REDIR: 0x5525100 (libc.so.6:strcpy) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x553eb10 (libc.so.6:__strcpy_sse2_unaligned) redirected to 0x4c2f080 (strcpy)
+==78361== Thread 2:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4020FF: login (server.c:318)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x402368: login (server.c:352)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+--78361-- REDIR: 0x552e380 (libc.so.6:memcpy@@GLIBC_2.14) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x55e76f0 (libc.so.6:__memcpy_avx_unaligned) redirected to 0x4c30500 (memcpy@@GLIBC_2.14)
+--78361-- REDIR: 0x5523820 (libc.so.6:strcat) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x5541930 (libc.so.6:__strcat_sse2_unaligned) redirected to 0x4c2ec40 (strcat)
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4035D1: login (server.c:581)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+--78361-- REDIR: 0x5523a20 (libc.so.6:index) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x5527390 (libc.so.6:strncpy) redirected to 0x4a26730 (_vgnU_ifunc_wrapper)
+--78361-- REDIR: 0x553f140 (libc.so.6:__strncpy_sse2_unaligned) redirected to 0x4c2f5b0 (__strncpy_sse2_unaligned)
+--78361-- REDIR: 0xffffffffff600400 (???:???) redirected to 0x3809e19d (???)
+--78361-- Reading syms from /lib/x86_64-linux-gnu/libgcc_s.so.1
+--78361--   Considering /lib/x86_64-linux-gnu/libgcc_s.so.1 ..
+--78361--   .. CRC mismatch (computed eaa68623 wanted ca38ad7e)
+--78361--    object doesn't have a symbol table
+==78361== Thread 3:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C3354F: strstr (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4042EF: communicate (server.c:791)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x40442F: communicate (server.c:804)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+--78361-- Discarding syms at 0x7079af0-0x7089845 in /lib/x86_64-linux-gnu/libgcc_s.so.1 due to munmap()
+--78361-- Discarding syms at 0x5e6a230-0x5e71393 in /lib/x86_64-linux-gnu/libnss_files-2.21.so due to munmap()
+==78361== 
+==78361== HEAP SUMMARY:
+==78361==     in use at exit: 1,240 bytes in 3 blocks
+==78361==   total heap usage: 54 allocs, 51 frees, 10,885 bytes allocated
+==78361== 
+==78361== Searching for pointers to 3 not-freed blocks
+==78361== Checked 16,931,680 bytes
+==78361== 
+==78361== Thread 1:
+==78361== 120 bytes in 1 blocks are definitely lost in loss record 1 of 3
+==78361==    at 0x4C2BBCF: malloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x5509DD7: getdelim (iogetdelim.c:66)
+==78361==    by 0x401928: main (server.c:139)
+==78361== 
+==78361== 560 bytes in 1 blocks are possibly lost in loss record 2 of 3
+==78361==    at 0x4C2DB95: calloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x40134B4: allocate_dtv (dl-tls.c:322)
+==78361==    by 0x40134B4: _dl_allocate_tls (dl-tls.c:544)
+==78361==    by 0x52840D2: allocate_stack (allocatestack.c:588)
+==78361==    by 0x52840D2: pthread_create@@GLIBC_2.2.5 (pthread_create.c:537)
+==78361==    by 0x401E79: main (server.c:269)
+==78361== 
+==78361== 560 bytes in 1 blocks are possibly lost in loss record 3 of 3
+==78361==    at 0x4C2DB95: calloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x40134B4: allocate_dtv (dl-tls.c:322)
+==78361==    by 0x40134B4: _dl_allocate_tls (dl-tls.c:544)
+==78361==    by 0x52840D2: allocate_stack (allocatestack.c:588)
+==78361==    by 0x52840D2: pthread_create@@GLIBC_2.2.5 (pthread_create.c:537)
+==78361==    by 0x40409A: login (server.c:726)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== LEAK SUMMARY:
+==78361==    definitely lost: 120 bytes in 1 blocks
+==78361==    indirectly lost: 0 bytes in 0 blocks
+==78361==      possibly lost: 1,120 bytes in 2 blocks
+==78361==    still reachable: 0 bytes in 0 blocks
+==78361==         suppressed: 0 bytes in 0 blocks
+==78361== 
+==78361== Use --track-origins=yes to see where uninitialised values come from
+==78361== ERROR SUMMARY: 8 errors from 8 contexts (suppressed: 0 from 0)
+==78361== 
+==78361== 1 errors in context 1 of 8:
+==78361== Thread 3:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x40442F: communicate (server.c:804)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== 
+==78361== 1 errors in context 2 of 8:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C3354F: strstr (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4042EF: communicate (server.c:791)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== 
+==78361== 1 errors in context 3 of 8:
+==78361== Thread 2:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4035D1: login (server.c:581)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== 
+==78361== 1 errors in context 4 of 8:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x402368: login (server.c:352)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== 
+==78361== 1 errors in context 5 of 8:
+==78361== Conditional jump or move depends on uninitialised value(s)
+==78361==    at 0x4C2F0A8: strcpy (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==78361==    by 0x4020FF: login (server.c:318)
+==78361==    by 0x52836A9: start_thread (pthread_create.c:333)
+==78361== 
+==78361== ERROR SUMMARY: 8 errors from 8 contexts (suppressed: 0 from 0)
