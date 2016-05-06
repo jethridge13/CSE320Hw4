@@ -103,7 +103,7 @@ int main(int argc, char** argv){
     char loginError[] = "Error logging in! Exiting.\n";
 
     /*LOG IN*/
-    write(sockfd, "WOLFIE \r\n\r\n\0", 12);
+    write(sockfd, "WOLFIE \r\n\r\n", 11);
     if(verbose){
         char wolfieSent[] = "WOLFIE sent\n";
         write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
@@ -156,7 +156,7 @@ int main(int argc, char** argv){
         memset(output, 0, sizeof(output));
         strcat(output, "NEWPASS ");
         strcat(output, pass);
-        strcat(output, " \r\n\r\n\0");
+        strcat(output, " \r\n\r\n");
         write(sockfd, output, strlen(output));
         if(verbose){
             char newpassSent[] = "NEWPASS sent\n";
@@ -202,7 +202,7 @@ int main(int argc, char** argv){
         memset(output, 0, sizeof(output));
         strcat(output, "IAM ");
         strcat(output, name);
-        strcat(output, " \r\n\r\n\0");
+        strcat(output, " \r\n\r\n");
         write(sockfd, output, strlen(output));
         if(verbose){
             char iamSent[] = "IAM sent\n";
@@ -275,6 +275,7 @@ int main(int argc, char** argv){
     int selectRet = 0;
     int stdinReady = 0;
     int listenReady = 0;
+    int chatReady = 0;
     fd_set fdRead;
 
     int timeInt, hours, minutes, seconds = 0;
@@ -295,8 +296,9 @@ int main(int argc, char** argv){
         FD_ZERO(&fdRead);
         FD_SET(fileno(stdin), &fdRead);
         FD_SET(sockfd, &fdRead);
+        FD_SET(sv[0], &fdRead);
 
-        selectRet = select(sockfd + 1, &fdRead, NULL, NULL, NULL);
+        selectRet = select(FD_SETSIZE, &fdRead, NULL, NULL, NULL);
 
         if(selectRet < 0){
             /* Something went wrong! */
@@ -304,6 +306,7 @@ int main(int argc, char** argv){
 
         stdinReady = FD_ISSET(fileno(stdin), &fdRead);
         listenReady = FD_ISSET(sockfd, &fdRead);
+        chatReady = FD_ISSET(sv[0], &fdRead);
 
         /* Handle connection */
         if(listenReady) {
@@ -353,7 +356,7 @@ int main(int argc, char** argv){
                     write(1, msgReceived, strlen(msgReceived));
                 }
 
-                char outputCpy[strlen(output) + 1];
+                char outputCpy[strlen(output)];
                 strcpy(outputCpy, output);
                 strtok(output, " \r\n");
                 token = strtok(NULL, " \r\n");
@@ -397,6 +400,20 @@ int main(int argc, char** argv){
             }
             else {
                 write(1, output, strlen(output));
+            }
+        }
+
+        /*Handle Chat*/
+        if(chatReady) {
+            memset(output, 0, sizeof(output));
+            read(sv[0], output, MAX_LINE);
+            if(strstr(output, "MSG ") == output) {
+                if(verbose){
+                    char msgReceived[] = "MSG received\n";
+                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
+                    write(1, msgReceived, strlen(msgReceived));
+                }
+            write(sockfd, output, strlen(output));
             }
         }
 
@@ -482,6 +499,7 @@ int main(int argc, char** argv){
         selectRet = 0;
         stdinReady = 0;
         listenReady = 0;
+        chatReady = 0;
     }
 }
 

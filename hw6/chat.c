@@ -29,7 +29,7 @@ int main(int argc, char** argv){
         FD_SET(fileno(stdin), &fdRead);
         FD_SET(chatfd, &fdRead);
 
-        selectRet = select(chatfd + 1, &fdRead, NULL, NULL, NULL);
+        selectRet = select(FD_SETSIZE, &fdRead, NULL, NULL, NULL);
 
         if(selectRet < 0){
             /* Something went wrong! */
@@ -66,13 +66,17 @@ int main(int argc, char** argv){
         /* Handle STDIN */
         if(stdinReady) {
             if(fgets(input, MAX_LINE - 6, stdin) != NULL) {
-                write(chatfd, "MSG ", 4);
-                write(chatfd, toName, strlen(toName));
-                write(chatfd, " ", 1);
-                write(chatfd, fromName, strlen(fromName));
-                write(chatfd, " ", 1);
-                write(chatfd, input, strlen(input));
-                write(chatfd, " \r\n\r\n\0", 6);
+                if(!strcmp(input, "\n")) {
+                }
+                else {
+                    write(chatfd, "MSG ", 4);
+                    write(chatfd, toName, strlen(toName));
+                    write(chatfd, " ", 1);
+                    write(chatfd, fromName, strlen(fromName));
+                    write(chatfd, " ", 1);
+                    write(chatfd, input, strlen(input));
+                    write(chatfd, " \r\n\r\n", 5);
+                }
             }
         }
 
