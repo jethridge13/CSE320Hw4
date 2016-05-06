@@ -125,9 +125,9 @@ int main(int argc, char **argv) {
         if(addArgs <= 0) {
             sfwrite(&stdoutMutex, stderr, "%sMissing PORT_NUMBER and MOTD.\n", ERROR_TEXT);
         } else if(addArgs == 1) {
-            fprintf(stderr, "%sMissing MOTD.\n", ERROR_TEXT);
+            sfwrite(&stdoutMutex, stderr, "%sMissing MOTD.\n", ERROR_TEXT);
         } else if (addArgs > 3){
-            fprintf(stderr, "%sToo many arguments provided.\n", ERROR_TEXT);
+            sfwrite(&stdoutMutex, stderr, "%sToo many arguments provided.\n", ERROR_TEXT);
         }
         usage();
         exit(EXIT_FAILURE);
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
 
     port = atoi(portNumber);
     if(!port){
-    	fprintf(stderr, "%sInvalid PORT_NUMBER\n", ERROR_TEXT);
+    	sfwrite(&stdoutMutex, stderr, "%sInvalid PORT_NUMBER\n", ERROR_TEXT);
     	usage();
     	return EXIT_FAILURE;
     }
@@ -180,13 +180,13 @@ int main(int argc, char **argv) {
 			fclose(accountfd);
     	} else {
     		accountFile = NULL;
-    		printf("%sACCOUNTS_FILE does not exists. Using no file instead.\n", ERROR_TEXT);
+    		sfwrite(&stdoutMutex, stdout, "%sACCOUNTS_FILE does not exists. Using no file instead.\n", ERROR_TEXT);
     	}
 	}
     if(verbose){
-    	printf("%sPORT_NUMBER: %d\n%s", VERBOSE_TEXT, port, NORMAL_TEXT);
-    	printf("%sMOTD: %s\n%s", VERBOSE_TEXT, motd, NORMAL_TEXT);
-    	printf("%sACCOUNTS_FILE: %s\n%s", VERBOSE_TEXT, accountFile, NORMAL_TEXT);
+    	sfwrite(&stdoutMutex, stdout, "%sPORT_NUMBER: %d\n%s", VERBOSE_TEXT, port, NORMAL_TEXT);
+    	sfwrite(&stdoutMutex, stdout, "%sMOTD: %s\n%s", VERBOSE_TEXT, motd, NORMAL_TEXT);
+    	sfwrite(&stdoutMutex, stdout, "%sACCOUNTS_FILE: %s\n%s", VERBOSE_TEXT, accountFile, NORMAL_TEXT);
 	}
 
 	int listenfd;
@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
 	if(listenfd < 0){
-		printf("%sError creating socket.\n", ERROR_TEXT);
+		sfwrite(&stdoutMutex, stdout, "%sError creating socket.\n", ERROR_TEXT);
 		return EXIT_FAILURE;
 	}
 
@@ -215,20 +215,20 @@ int main(int argc, char **argv) {
 
 	int ret = bind(listenfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
 	if(ret < 0){
-		printf("%sError binding. Returned: %d\n", ERROR_TEXT, ret);
+		sfwrite(&stdoutMutex, stdout, "%sError binding. Returned: %d\n", ERROR_TEXT, ret);
 		return EXIT_FAILURE;
 	}
 
 	if(listen(listenfd, LISTENQ) < 0){
-		printf("%sError creating socket listener.\n", ERROR_TEXT);
-		//printf("%s\n", explain_bind(listenfd, serveraddr, sizeof(serveraddr)));
+		sfwrite(&stdoutMutex, stdout, "%sError creating socket listener.\n", ERROR_TEXT);
+		//sfwrite(&stdoutMutex, stdout, "%s\n", explain_bind(listenfd, serveraddr, sizeof(serveraddr)));
 		return EXIT_FAILURE;
 	}
-	//printf("%d\n", listenfd);
+	//sfwrite(&stdoutMutex, stdout, "%d\n", listenfd);
 
 	clientlen = sizeof(clientaddr);
 
-	printf("%sCurrently listening on port %d.\n", NORMAL_TEXT, port);
+	sfwrite(&stdoutMutex, stdout, "%sCurrently listening on port %d.\n", NORMAL_TEXT, port);
 
 	/* Initializing user list */
 	HEAD = malloc(sizeof(struct user));
@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
 		/* Handle connection */
 		if(connectReady){
 			if(verbose){
-				printf("%sSpawning login thread.\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sSpawning login thread.\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 			/*
 			pid_t childID = fork();
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
 			*/
 			connfd = accept(listenfd, (SA *)&clientaddr, (socklen_t*)&clientlen);
 			if(connfd < 0){
-				printf("%sError on accept.\n", ERROR_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sError on accept.\n", ERROR_TEXT);
 			}
 			
 			hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
@@ -284,7 +284,7 @@ int main(int argc, char **argv) {
 			if(hostaddrp == NULL){
 
 			}
-			printf("%sServer established connection with %s (%s)\n",
+			sfwrite(&stdoutMutex, stdout, "%sServer established connection with %s (%s)\n",
 				NORMAL_TEXT, hostp->h_name, hostaddrp);
 
 			pthread_create(&tid, NULL, login, &connfd);
@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
 
 		/* Handle STDIN */
 		if(stdinReady){
-			//printf("%s%s", NORMAL_TEXT, CURSOR);
+			//sfwrite(&stdoutMutex, stdout, "%s%s", NORMAL_TEXT, CURSOR);
 			fgets(cmd, MAX_LINE, stdin);
 			strtok(cmd, "\n");
 			if(!strcmp(cmd, "/help")){
@@ -353,12 +353,12 @@ void *login(void *vargp){
 		cmd = strstr(buf, WOLFIE);
 		if(cmd != NULL){
 			if(verbose){
-				printf("%sWOLFIE received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sWOLFIE received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 			char connect[] = "EIFLOW \r\n\r\n";
 			write(connfd, connect, strlen(connect));
 			if(verbose){
-				printf("%sEIFLOW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sEIFLOW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 
 			bzero(buf, MAX_LINE);
@@ -386,7 +386,7 @@ void *login(void *vargp){
 				cmd = strstr(buf, IAM);
 				if(cmd != NULL){
 					if(verbose){
-						printf("%sIAM received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+						sfwrite(&stdoutMutex, stdout, "%sIAM received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 					}
 
 					char name[strlen(buf)];
@@ -457,7 +457,7 @@ void *login(void *vargp){
 						write(connfd, authSend, strlen(authSend));
 
 						if(verbose){
-							printf("%sAUTH sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							sfwrite(&stdoutMutex, stdout, "%sAUTH sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 						}
 
 						bzero(buf, MAX_LINE);
@@ -557,7 +557,7 @@ void *login(void *vargp){
 						connected = true;
 
 						if(verbose){
-							printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							sfwrite(&stdoutMutex, stdout, "%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 						}
 					} else {
 						if(!uniqueName){
@@ -581,7 +581,7 @@ void *login(void *vargp){
 					cmd = strstr(buf, IAMNEW);
 					if(cmd != NULL){
 						if(verbose){
-							printf("%sIAMNEW received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							sfwrite(&stdoutMutex, stdout, "%sIAMNEW received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 						}
 						char name[strlen(buf)];
 						memcpy(name, &buf[7], strlen(buf) - 2);
@@ -618,7 +618,7 @@ void *login(void *vargp){
 						if(notDuplicate) {
 							write(connfd, hiSend, strlen(hiSend));
 							if(verbose){
-								printf("%sHINEW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+								sfwrite(&stdoutMutex, stdout, "%sHINEW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 							}
 
 							bzero(buf, MAX_LINE);
@@ -646,7 +646,7 @@ void *login(void *vargp){
 								cmd = strstr(buf, NEWPASS);
 								if(cmd != NULL){
 									if(verbose){
-										printf("%sNEWPASS received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+										sfwrite(&stdoutMutex, stdout, "%sNEWPASS received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 									}
 									char pass[strlen(buf)];
 									memcpy(pass, &buf[7], strlen(buf) - 2);
@@ -692,7 +692,7 @@ void *login(void *vargp){
 										char validP[] = "SSAPWEN \r\n\r\n";
 										write(connfd, validP, strlen(validP));
 										if(verbose){
-											printf("%sSSAPWEN sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+											sfwrite(&stdoutMutex, stdout, "%sSSAPWEN sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 										}
 
 										char hi[] = "HI ";
@@ -734,7 +734,7 @@ void *login(void *vargp){
 
 										write(connfd, hiSend, strlen(hiSend));
 										if(verbose){
-											printf("%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+											sfwrite(&stdoutMutex, stdout, "%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 										}
 
 										char message[MAX_LINE];
@@ -806,7 +806,7 @@ void *login(void *vargp){
 
 void* communicate(){
 	if(verbose){
-		printf("%sCOMMUNICATION THREAD STARTED\n", VERBOSE_TEXT);
+		sfwrite(&stdoutMutex, stdout, "%sCOMMUNICATION THREAD STARTED\n", VERBOSE_TEXT);
 	}
 	signal(SIGUSR1, sigComm);
 	int selectRet = 0;
@@ -1008,13 +1008,13 @@ void* communicate(){
 								userCursor = HEAD;
 								write(userCursor->connfd, uoff, strlen(uoff));
 								if(verbose){
-									printf("%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+									sfwrite(&stdoutMutex, stdout, "%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 								}
 								while(userCursor->next != 0){
 									userCursor = userCursor->next;
 									write(userCursor->connfd, uoff, strlen(uoff));
 									if(verbose){
-										printf("%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+										sfwrite(&stdoutMutex, stdout, "%sUOFF sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 									}
 								}
 							}
@@ -1099,7 +1099,7 @@ void* communicate(){
 		if(!usersConnected){
 			FD_ZERO(&commfd);
 			if(verbose){
-				printf("%sCOMMUNICATION THREAD ENDED\n", VERBOSE_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sCOMMUNICATION THREAD ENDED\n", VERBOSE_TEXT);
 			}
 			commRun = false;
 			pthread_exit(EXIT_SUCCESS);
@@ -1147,17 +1147,17 @@ bool validPassword(char* password){
 
 void users(){
 	if(!usersConnected){
-		printf("%sNo users connected.\n", NORMAL_TEXT);
+		sfwrite(&stdoutMutex, stdout, "%sNo users connected.\n", NORMAL_TEXT);
 	} else {
 		userCursor = HEAD;
 		int i = 0;
-		printf("%s%d: %s 	FD: %d\n", 
+		sfwrite(&stdoutMutex, stdout, "%s%d: %s 	FD: %d\n", 
 			NORMAL_TEXT, ++i, userCursor->name, userCursor->connfd);
 
 		while(userCursor->next != 0){
 			userCursor = userCursor->next;
 
-			printf("%s%d: %s	FD: %d\n", 
+			sfwrite(&stdoutMutex, stdout, "%s%d: %s	FD: %d\n", 
 				NORMAL_TEXT, ++i, userCursor->name, userCursor->connfd);
 		}
 	}
@@ -1171,29 +1171,29 @@ void accounts(){
 	} else {
 		AuserCursor = AHEAD;
 		int i = 0;
-		printf("%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
+		sfwrite(&stdoutMutex, stdout, "%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
 
 		while(AuserCursor->next != 0){
 			AuserCursor = AuserCursor->next;
-			printf("%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
+			sfwrite(&stdoutMutex, stdout, "%s%d: %s\n", NORMAL_TEXT, ++i, AuserCursor->name);
 		}
 	}
 }
 
 int sd(){
 	P(&lists);
-	printf("%sSHUTTING DOWN\n", NORMAL_TEXT);
+	sfwrite(&stdoutMutex, stdout, "%sSHUTTING DOWN\n", NORMAL_TEXT);
 	userCursor = HEAD;
 	if(usersConnected > 0){
 		write(userCursor->connfd, BYE, strlen(BYE));
 		if(verbose){
-			printf("%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+			sfwrite(&stdoutMutex, stdout, "%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 		}
 		while(userCursor->next != 0){
 			userCursor = userCursor->next;
 			write(userCursor->connfd, BYE, strlen(BYE));
 			if(verbose){
-				printf("%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				sfwrite(&stdoutMutex, stdout, "%sBYE sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
 			}
 		}
 	}
@@ -1251,7 +1251,7 @@ int sd(){
 }
 
 void help(){
-	printf(
+	sfwrite(&stdoutMutex, stdout, 
 		"%sUsage:\n"
 		"/accts 	Displays all accounts loaded.\n"
 		"/help		Displays this help menu.\n"
@@ -1260,7 +1260,7 @@ void help(){
 }
 
 void usage(){
-	printf(
+	sfwrite(&stdoutMutex, stdout, 
 		"%s./server [-hv] [-t THREAD_COUNT] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n"
 		"-h 				Displays help menu & returns EXIT_SUCCESS.\n"
 		"-t THREAD_COUNT	The number of threads used for the login queue.\n"
