@@ -506,6 +506,7 @@ int main(int argc, char** argv){
 void usage(){
 	printf(
 		"\n\x1B[0m ./client [-hcv] NAME SERVER_IP SERVER_PORT\n"
+        "-a FILE        Path to the audit log file.\n"
 		"-h 			Displays this help menu and returns EXIT_SUCCESS.\n"
 		"-c 			Requests to server to create a new user.\n"
 		"-v 			Verbose print all incoming and outgoing protocl verbs & content.\n"

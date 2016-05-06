@@ -68,6 +68,10 @@ int main(int argc, char** argv){
             if(fgets(input, MAX_LINE - 6, stdin) != NULL) {
                 if(!strcmp(input, "\n")) {
                 }
+                if(!strcmp(input, "/close\n")) {
+                    close(chatfd);
+                    return EXIT_SUCCESS;
+                }
                 else {
                     write(chatfd, "MSG ", 4);
                     write(chatfd, toName, strlen(toName));
