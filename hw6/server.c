@@ -3,6 +3,7 @@
 #include "csapp.h"
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#include <semaphore.h>
 
 #define NORMAL_TEXT "\x1B[0m"
 #define ERROR_TEXT "\x1B[1;31m"
@@ -37,13 +38,14 @@ void usage();
 void testPrint(char* string);
 void testPrintInt(int i);
 
-/* TODO Hashing and salt */
+/* TODO Make the program catch kill9 thingy */
 
 bool verbose = false;
 
 int usersConnected = 0;
 int accountsInFile = 0;
 
+bool acctFileAvailable = false;
 FILE *accountfd = NULL;
 
 pthread_t commT;
@@ -76,9 +78,14 @@ struct account *AHEAD, *AuserCursor, *AuserCursorPrev;
 char* motd = NULL;
 char* accountFile = NULL;
 
+sem_t lists;
+
 int main(int argc, char **argv) {
 
+	Sem_init(&lists, 0, 1);
+
 	signal(SIGINT, sigShutDown);
+	signal(SIGKILL, sigShutDown);
 
 	int opt, port, argumentsPassed = 0;
 	int connfd;
@@ -134,6 +141,7 @@ int main(int argc, char **argv) {
     	int fe = stat(accountFile, &dfe);
     	bool fileExists = !fe;
     	if(fileExists){
+    		acctFileAvailable = true;
 			accountfd = fopen(accountFile, "r");
 			char* readBuffer = NULL;
 			size_t length = 0;
@@ -160,7 +168,6 @@ int main(int argc, char **argv) {
 				whileRead = getdelim(&readBuffer, &length, 10, accountfd);
 			}
 			fclose(accountfd);
-			accountfd = fopen(accountFile, "w");
     	} else {
     		accountFile = NULL;
     		printf("%sACCOUNTS_FILE does not exists. Using no file instead.\n", ERROR_TEXT);
@@ -388,6 +395,8 @@ void *login(void *vargp){
 					bool acctExists = false;
 
 					/* Make user accountname is unique */
+					/* Make sure the lists are locked */
+					P(&lists);
 					AuserCursor = AHEAD;
 					if(accountsInFile > 1){
 						while(AuserCursor->next != 0){
@@ -420,6 +429,8 @@ void *login(void *vargp){
 							uniqueName = false;
 						}
 					}
+					V(&lists);
+					/* Unlock the lists */
 
 					bool passwordMatch = false;
 
@@ -506,6 +517,8 @@ void *login(void *vargp){
 					/* If name user gave is unique 
 						and acct exists */
 					if(uniqueName && acctExists && passwordMatch){
+						/* Lock the lists */
+						P(&lists);
 						if(usersConnected){
 							userCursor->next = malloc(sizeof(struct user));
 							userCursorPrev = userCursor;
@@ -517,6 +530,8 @@ void *login(void *vargp){
 						userCursor->connfd = connfd;
 						userCursor->timeJoined = time(0);
 						userCursor->next = 0;
+						V(&lists);
+						/* Unlock the lists */
 
 						char message[MAX_LINE];
 						char motdverb[] = "MOTD ";
@@ -573,8 +588,9 @@ void *login(void *vargp){
 
 						bool notDuplicate = true;
 
+						/* Lock the lists */
+						P(&lists);
 						if(accountsInFile > 0){
-							/* TODO When accounts are actually loaded */
 							notDuplicate = true;
 							AuserCursor = AHEAD;
 							if(!strcmp(userName, AuserCursor->name)){
@@ -587,6 +603,8 @@ void *login(void *vargp){
 								}
 							}
 						} 
+						V(&lists);
+
 						if(notDuplicate) {
 							write(connfd, hiSend, strlen(hiSend));
 							if(verbose){
@@ -674,6 +692,8 @@ void *login(void *vargp){
 										strcat(hiSend, ENDVERB);
 										strcat(hiSend, "\0");
 
+										/* Lock the lists */
+										P(&lists);
 										/* Initialize user */
 										if(usersConnected){
 											userCursor->next = malloc(sizeof(struct user));
@@ -699,6 +719,8 @@ void *login(void *vargp){
 										AuserCursor->next = 0;
 										strncpy(AuserCursor->pwd, outputBuffer, 65);
 										strncpy((char*)(AuserCursor->salt), (char*)salt, 5);
+										V(&lists);
+										/* Unlock the lists */
 
 										write(connfd, hiSend, strlen(hiSend));
 										if(verbose){
@@ -809,6 +831,8 @@ void* communicate(){
 				/* Check to see if the ith fd is triggered */
 				if(FD_ISSET(i, &commfd)){
 					/* Find out of that fd corresponds to a user */
+					/* Lock the lists */
+					//P(&lists);
 					userCursor = HEAD;
 					if(userCursor->connfd == i){
 						clientReady = true;
@@ -820,6 +844,8 @@ void* communicate(){
 							}
 						}
 					}
+					//V(&lists);
+					/* Unlock the lists */
 				}
 				/* If user is ready, handle user stuff */
 				if(clientReady){
@@ -946,6 +972,8 @@ void* communicate(){
 
 							/* Close everything */
 							//FD_CLR(userCursor->connfd, &commfd);
+							/* Lock the lists */
+							P(&lists);
 							close(userCursor->connfd);
 							if(usersConnected > 1){
 								if(userCursor->prev != 0){
@@ -980,6 +1008,7 @@ void* communicate(){
 									}
 								}
 							}
+							V(&lists);
 						}
 						cmd = strstr(buf, MSG);
 						if(cmd != NULL){
@@ -1036,6 +1065,7 @@ void* communicate(){
 										fromFound = true;
 									}
 								}
+								fromFound = true;
 								if(!fromFound){
 									char error[] = "ERR 100 '<FROM> User not found.' \r\n\r\n";
 									write(i, error, strlen(error));
@@ -1141,6 +1171,7 @@ void accounts(){
 }
 
 int sd(){
+	P(&lists);
 	printf("%sSHUTTING DOWN\n", NORMAL_TEXT);
 	userCursor = HEAD;
 	if(usersConnected > 0){
@@ -1168,7 +1199,8 @@ int sd(){
 		}
 	}
 	free(HEAD);
-	if(accountfd != NULL){
+	if(acctFileAvailable){
+		accountfd = fopen(accountFile, "w");
 		AuserCursor = AHEAD;
 		if(accountsInFile > 0){
 			write(fileno(accountfd), AuserCursor->name, strlen(AuserCursor->name));
@@ -1204,12 +1236,14 @@ int sd(){
 	if(commRun){
 		pthread_cancel(commT);
 	}
+	V(&lists);
 	return EXIT_SUCCESS;
 }
 
 void help(){
 	printf(
 		"%sUsage:\n"
+		"/accts 	Displays all accounts loaded.\n"
 		"/help		Displays this help menu.\n"
 		"/shutdown	Disconnects all users and shuts down the server.\n"
 		"/users		Displays all currently logged-on users.\n", NORMAL_TEXT);
@@ -1217,12 +1251,13 @@ void help(){
 
 void usage(){
 	printf(
-		"%s./server [-h|-v] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n"
-		"-h 			Displays help menu & returns EXIT_SUCCESS.\n"
-		"-v 			Verbose print all incoming and outgoing protocol verbs & content.\n"
-		"PORT_NUMBER 	Port number to listn on.\n"
-		"MOTD 			Message to display to the client when they connect.\n"
-		"ACCOUNTS_FILE 	File containing username and password data to be loaded upon execution.\n", NORMAL_TEXT);
+		"%s./server [-hv] [-t THREAD_COUNT] PORT_NUMBER MOTD [ACCOUNTS_FILE]\n"
+		"-h 				Displays help menu & returns EXIT_SUCCESS.\n"
+		"-t THREAD_COUNT	The number of threads used for the login queue.\n"
+		"-v 				Verbose print all incoming and outgoing protocol verbs & content.\n"
+		"PORT_NUMBER 		Port number to listn on.\n"
+		"MOTD 				Message to display to the client when they connect.\n"
+		"ACCOUNTS_FILE 		File containing username and password data to be loaded upon execution.\n", NORMAL_TEXT);
 }
 
 void testPrint(char* string){
