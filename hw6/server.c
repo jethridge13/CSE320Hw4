@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "csapp.h"
+#include "sfwrite.c"
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <semaphore.h>
@@ -80,9 +80,19 @@ char* accountFile = NULL;
 
 sem_t lists;
 
+pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void P(sem_t *s){
+	sem_wait(s);
+}
+
+void V(sem_t *s){
+	sem_post(s);
+}
+
 int main(int argc, char **argv) {
 
-	Sem_init(&lists, 0, 1);
+	sem_init(&lists, 0, 1);
 
 	signal(SIGINT, sigShutDown);
 	signal(SIGKILL, sigShutDown);
@@ -113,7 +123,7 @@ int main(int argc, char **argv) {
 		accountFile = argv[optind++];
     } else {
         if(addArgs <= 0) {
-            fprintf(stderr, "%sMissing PORT_NUMBER and MOTD.\n", ERROR_TEXT);
+            sfwrite(&stdoutMutex, stderr, "%sMissing PORT_NUMBER and MOTD.\n", ERROR_TEXT);
         } else if(addArgs == 1) {
             fprintf(stderr, "%sMissing MOTD.\n", ERROR_TEXT);
         } else if (addArgs > 3){
