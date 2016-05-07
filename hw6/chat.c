@@ -7,9 +7,11 @@
 
 int main(int argc, char** argv){
 	int chatfd = atoi(argv[1]);
-	char* fromName = argv[2];
-	char* toName = argv[3];
+    int auditfd =  atoi(argv[2]);
+	char* fromName = argv[3];
+	char* toName = argv[4];
     pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+    char auditBuffer[200];
 
 	sfwrite(&stdoutMutex, stdout, "Now chatting with %s\n", toName);
 
@@ -71,6 +73,12 @@ int main(int argc, char** argv){
                 if(!strcmp(input, "\n")) {
                 }
                 if(!strcmp(input, "/close\n")) {
+                    char timeStr[50];
+                    time_t curtime = time(NULL);
+                    struct tm * timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /close, success, chat\n", timeStr, fromName);
+                    write(auditfd, auditBuffer, strlen(auditBuffer));
                     close(chatfd);
                     return EXIT_SUCCESS;
                 }

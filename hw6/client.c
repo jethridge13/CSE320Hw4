@@ -30,6 +30,7 @@ int main(int argc, char** argv){
 	char* serverIP = NULL;
 	char* serverPort = NULL;
     char* auditFile = NULL;
+    char auditBuffer[200];
     FILE* audit = NULL;
 	while((opt = getopt(argc, argv, "a:hcv")) != -1) {
         switch(opt) {
@@ -142,7 +143,8 @@ int main(int argc, char** argv){
         curtime = time(NULL);
         timeStruct = localtime(&curtime);
         strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-        fprintf(audit, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
         fclose(audit);
         return EXIT_FAILURE;
@@ -176,7 +178,8 @@ int main(int argc, char** argv){
             curtime = time(NULL);
             timeStruct = localtime(&curtime);
             strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-            fprintf(audit, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
             fclose(audit);
             return EXIT_FAILURE;
@@ -217,7 +220,8 @@ int main(int argc, char** argv){
             curtime = time(NULL);
             timeStruct = localtime(&curtime);
             strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-            fprintf(audit, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
             fclose(audit);
             return EXIT_FAILURE;
@@ -240,7 +244,8 @@ int main(int argc, char** argv){
         curtime = time(NULL);
         timeStruct = localtime(&curtime);
         strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-        fprintf(audit, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
     }
 
     /*ELSE LOG IN*/
@@ -272,7 +277,8 @@ int main(int argc, char** argv){
             curtime = time(NULL);
             timeStruct = localtime(&curtime);
             strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-            fprintf(audit, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
             fclose(audit);
             return EXIT_FAILURE;
@@ -314,7 +320,8 @@ int main(int argc, char** argv){
             curtime = time(NULL);
             timeStruct = localtime(&curtime);
             strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-            fprintf(audit, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
             fclose(audit);
             return EXIT_FAILURE;
@@ -333,7 +340,8 @@ int main(int argc, char** argv){
         curtime = time(NULL);
         timeStruct = localtime(&curtime);
         strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-        fprintf(audit, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
     }
 
     /*MULTIPLEX*/
@@ -401,7 +409,8 @@ int main(int argc, char** argv){
                 curtime = time(NULL);
                 timeStruct = localtime(&curtime);
                 strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                fprintf(audit, "%s, %s, LOGOUT, intentional\n", timeStr, name);
+                sprintf(auditBuffer, "%s, %s, LOGOUT, intentional\n", timeStr, name);
+                write(fileno(audit), auditBuffer, strlen(auditBuffer));
 
                 fclose(audit);
                 close(sockfd);
@@ -441,10 +450,14 @@ int main(int argc, char** argv){
                 curtime = time(NULL);
                 timeStruct = localtime(&curtime);
                 strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                if(!strcmp(fromPtr, name))
-                    fprintf(audit, "%s, %s, MSG, to, %s\n", timeStr, name, fromPtr);
-                else
-                    fprintf(audit, "%s, %s, MSG, from, %s\n", timeStr, name, fromPtr);
+                if(!strcmp(fromPtr, name)) {
+                    sprintf(auditBuffer, "%s, %s, MSG, to, %s\n", timeStr, name, fromPtr);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
+                else {
+                    sprintf(auditBuffer, "%s, %s, MSG, from, %s\n", timeStr, toPtr, fromPtr);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
 
                 if(chatOpen == false) {
                     childID = fork();
@@ -453,15 +466,17 @@ int main(int argc, char** argv){
 
                         char fdStr[12];
                         snprintf(fdStr, 12, "%i", sv[1]);
+                        char auditfdStr[12];
+                        snprintf(auditfdStr, 12, "%i", fileno(audit));
 
                         int status = 1;
 
                         if(!strcmp(fromPtr, name)) {
-                            char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, fromPtr, toPtr, NULL};
+                            char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, auditfdStr, fromPtr, toPtr, NULL};
                             status = execv("/usr/bin/xterm", xterm);
                         }
                         else {
-                            char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, toPtr, fromPtr, NULL};
+                            char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, auditfdStr, toPtr, fromPtr, NULL};
                             status = execv("/usr/bin/xterm", xterm);
                         }
 
@@ -503,15 +518,17 @@ int main(int argc, char** argv){
             if(fgets(input, MAX_LINE - 6, stdin) != NULL) {
                 if(*input == '\n')
                     continue;
-                if(!strcmp(input, "/audit\n")) {
-                    if(verbose){
-                        char timeSent[] = "TIME sent\n";
-                        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
-                        sfwrite(&stdoutMutex, stdout, timeSent);
-                    }
-                    write(sockfd, "TIME \r\n\r\n\0", 10);
+                else if(!strcmp(input, "/audit\n")) {
+                    rewind(audit);
+                    while(fgets(auditBuffer, 200, audit) != NULL)
+                        sfwrite(&stdoutMutex, stdout, auditBuffer);
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /audit, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
-                if(!strcmp(input, "/time\n")) {
+                else if(!strcmp(input, "/time\n")) {
                     if(verbose){
                         char timeSent[] = "TIME sent\n";
                         sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
@@ -522,7 +539,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, /time, success, client\n", timeStr, name);
+                    sprintf(auditBuffer, "%s, %s, CMD, /time, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/help\n")) {
                     sfwrite(&stdoutMutex, stdout,
@@ -536,7 +554,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, /help, success, client\n", timeStr, name);
+                    sprintf(auditBuffer, "%s, %s, CMD, /help, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/logout\n")) {
                     if(verbose){
@@ -549,7 +568,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, /logout, success, client\n", timeStr, name);
+                    sprintf(auditBuffer, "%s, %s, CMD, /logout, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/listu\n")) {
                     if(verbose){
@@ -562,7 +582,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, /listu, success, client\n", timeStr, name);
+                    sprintf(auditBuffer, "%s, %s, CMD, /listu, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(strstr(input, "/chat") == input) {
                     strtok(input, " \r\n");
@@ -576,7 +597,8 @@ int main(int argc, char** argv){
                         curtime = time(NULL);
                         timeStruct = localtime(&curtime);
                         strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                        fprintf(audit, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        sprintf(auditBuffer, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        write(fileno(audit), auditBuffer, strlen(auditBuffer));
                         continue;
     
                     }
@@ -589,7 +611,8 @@ int main(int argc, char** argv){
                         curtime = time(NULL);
                         timeStruct = localtime(&curtime);
                         strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                        fprintf(audit, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        sprintf(auditBuffer, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        write(fileno(audit), auditBuffer, strlen(auditBuffer));
                         fflush(stdout);
                         continue;
                     }
@@ -609,7 +632,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, /chat, success, client\n", timeStr, name);
+                    sprintf(auditBuffer, "%s, %s, CMD, /chat, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else {
                     sfwrite(&stdoutMutex, stdout, "%s\n", "Invalid command. Enter /help for a list of commands.");
@@ -617,7 +641,8 @@ int main(int argc, char** argv){
                     curtime = time(NULL);
                     timeStruct = localtime(&curtime);
                     strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
-                    fprintf(audit, "%s, %s, CMD, %s, fail, client\n", timeStr, name, strtok(input, "\n"));
+                    sprintf(auditBuffer, "%s, %s, CMD, %s, fail, client\n", timeStr, name, strtok(input, "\n"));
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
             }
         }
