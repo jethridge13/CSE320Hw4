@@ -31,6 +31,7 @@ void accounts();
 int sd();
 bool validPassword(char* password);
 void *login(void *connfd);
+void *loginNew();
 void *communicate();
 void sigComm(int sig);
 void sigShutDown();
@@ -71,16 +72,25 @@ struct account {
 	struct account *prev;
 };
 
+struct queueItem {
+	int fd;
+	struct queueItem *next;
+};
+
 struct user *HEAD, *userCursor, *userCursorPrev;
 
 struct account *AHEAD, *AuserCursor, *AuserCursorPrev;
+
+struct queueItem *QHEAD, *QuserCursor; 
 
 char* motd = NULL;
 char* accountFile = NULL;
 
 sem_t lists;
+sem_t queue;
 
 pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queueMutex = PTHREAD_MUTEX_INITIALIZER;
 
 void P(sem_t *s){
 	sem_wait(s);
@@ -93,6 +103,7 @@ void V(sem_t *s){
 int main(int argc, char **argv) {
 
 	sem_init(&lists, 0, 1);
+	sem_init(&queue, 0, 0);
 
 	signal(SIGINT, sigShutDown);
 	signal(SIGKILL, sigShutDown);
@@ -801,6 +812,503 @@ void *login(void *vargp){
 	}
 
 	pthread_exit(EXIT_SUCCESS);
+	return NULL;
+}
+
+void *loginNew(){
+	while(true){
+		P(&queue);
+		pthread_mutex_lock(&queueMutex);
+		QuserCursor = QHEAD;
+		int connfd = QuserCursor->fd;
+		if(QuserCursor->next != 0){
+			QHEAD = QuserCursor->next;
+			free(QuserCursor);
+		}
+		pthread_mutex_unlock(&queueMutex);
+		//pthread_t id = pthread_self();
+
+		char buf[MAX_LINE];
+		bzero(buf, MAX_LINE);
+
+		read(connfd, buf, MAX_LINE);
+
+		char* cmd = strstr(buf, ENDVERB);
+		int charLeft = MAX_LINE;
+		bool verbFound = false;
+		bool connected = false;
+
+		/* This bracket will check for verbs for the length of
+		MAX_LINE. If MAX_LINE is exceeded and no verbs found, 
+		will write an error to the client and disconnect them. */
+		if(cmd == NULL){
+			while(charLeft > 0){
+				char buf2[charLeft];
+				read(connfd, buf2, charLeft);
+				strcpy(buf+strlen(buf), buf2);
+				cmd = strstr(buf, ENDVERB);
+				if(cmd != NULL){
+					verbFound = true;
+					break;
+				}
+				charLeft = charLeft - strlen(buf);
+			}
+		} else {
+			verbFound = true;
+		}
+
+		/* Verb found. Should be WOLFIE, then IAM. */
+		if(verbFound){
+			cmd = strstr(buf, WOLFIE);
+			if(cmd != NULL){
+				if(verbose){
+					sfwrite(&stdoutMutex, stdout, "%sWOLFIE received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				}
+				char connect[] = "EIFLOW \r\n\r\n";
+				write(connfd, connect, strlen(connect));
+				if(verbose){
+					sfwrite(&stdoutMutex, stdout, "%sEIFLOW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+				}
+
+				bzero(buf, MAX_LINE);
+				read(connfd, buf, MAX_LINE);
+				cmd = strstr(buf, ENDVERB);
+				charLeft = MAX_LINE;
+				verbFound = false;
+				if(cmd == NULL){
+					while(charLeft > 0){
+						char buf2[charLeft];
+						read(connfd, buf2, charLeft);
+						strcpy(buf+strlen(buf), buf2);
+
+						cmd = strstr(buf, ENDVERB);
+						if(cmd != NULL){
+							verbFound = true;
+							break;
+						}
+						charLeft = charLeft - strlen(buf);
+					}
+				} else {
+					verbFound = true;
+				}
+				if(verbFound){
+					cmd = strstr(buf, IAM);
+					if(cmd != NULL){
+						if(verbose){
+							sfwrite(&stdoutMutex, stdout, "%sIAM received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+						}
+
+						char name[strlen(buf)];
+						memcpy(name, &buf[4], strlen(buf) - 2);
+						char hi[] = "HI ";
+
+						char* userName = strtok(name, ENDVERB);
+						userName = strtok(userName, " ");
+
+						char hiSend[strlen(name) + strlen(hi) + 6];
+						strcpy(hiSend, hi);
+						strcat(hiSend, name);
+						strcat(hiSend, ENDVERB);
+						//strcat(hiSend, "\0");
+
+						bool acctExists = false;
+
+						/* Make user accountname is unique */
+						/* Make sure the lists are locked */
+						P(&lists);
+						AuserCursor = AHEAD;
+						if(accountsInFile > 1){
+							while(AuserCursor->next != 0){
+								if(!strcmp(userName, AuserCursor->name)){
+									acctExists = true;
+									break;
+								}
+							AuserCursor = AuserCursor->next;
+							}
+						} else if(accountsInFile == 1){
+							if(!strcmp(userName, AuserCursor->name)){
+								acctExists = true;
+							}
+						}
+
+						bool uniqueName = true;
+
+						/* Make user username is unique */
+						userCursor = HEAD;
+						if(usersConnected > 1){
+							while(userCursor->next != 0){
+								if(!strcmp(userName, userCursor->name)){
+									uniqueName = false;
+									break;
+								}
+							userCursor = userCursor->next;
+							}
+						} else if(usersConnected == 1){
+							if(!strcmp(userName, userCursor->name)){
+								uniqueName = false;
+							}
+						}
+						V(&lists);
+						/* Unlock the lists */
+
+						bool passwordMatch = false;
+
+						if(uniqueName && acctExists){
+							char auth[strlen(buf)];
+							memcpy(auth, &buf[4], strlen(buf) - 2);
+							char hi[] = "AUTH ";
+
+							char authSend[strlen(auth) + strlen(hi) + 6];
+							strcpy(authSend, hi);
+							strcat(authSend, name);
+							strcat(authSend, ENDVERB);
+
+							write(connfd, authSend, strlen(authSend));
+
+							if(verbose){
+								sfwrite(&stdoutMutex, stdout, "%sAUTH sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							}
+
+							bzero(buf, MAX_LINE);
+							read(connfd, buf, MAX_LINE);
+							cmd = strstr(buf, ENDVERB);
+							charLeft = MAX_LINE;
+							verbFound = false;
+							if(cmd == NULL){
+								while(charLeft > 0){
+									char buf2[charLeft];
+									read(connfd, buf2, charLeft);
+									strcpy(buf+strlen(buf), buf2);
+
+									cmd = strstr(buf, ENDVERB);
+									if(cmd != NULL){
+										verbFound = true;
+										break;
+									}
+									charLeft = charLeft - strlen(buf);
+								}
+							} else {
+								verbFound = true;
+							}
+							if(verbFound){
+								cmd = strstr(buf, PASS);
+								if(cmd != NULL){
+									char pwd[strlen(buf)];
+									memcpy(pwd, &buf[4], strlen(buf) - 2);
+									char hi[] = "SSAP ";
+
+									char* password = strtok(pwd, ENDVERB);
+									password = strtok(password, " ");
+
+									char passSend[strlen(pwd) + strlen(hi) + 6];
+									strcpy(passSend, hi);
+									strcat(passSend, pwd);
+									strcat(passSend, ENDVERB);
+
+									unsigned char salt[5];
+									strcpy((char*)salt, (char*)AuserCursor->salt);
+
+									char passwordHash[strlen(password) + 5];
+									strcpy(passwordHash, password);
+									//strcat(passwordHash, (char*) salt);
+
+									unsigned char hash[SHA256_DIGEST_LENGTH];
+									SHA256_CTX sha256;
+									SHA256_Init(&sha256);
+									SHA256_Update(&sha256, password, strlen(password));
+									SHA256_Final(hash, &sha256);
+
+									char outputBuffer[65];
+									int i = 0;
+									for(; i < SHA256_DIGEST_LENGTH; i++){
+										sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+									}
+									outputBuffer[64] = 0;
+
+									if(!strcmp(outputBuffer, AuserCursor->pwd)){
+										passwordMatch = true;
+										write(connfd, passSend, strlen(passSend));
+									}
+								}
+							}
+						}
+						
+						/* If name user gave is unique 
+							and acct exists */
+						if(uniqueName && acctExists && passwordMatch){
+							/* Lock the lists */
+							P(&lists);
+							if(usersConnected){
+								userCursor->next = malloc(sizeof(struct user));
+								userCursorPrev = userCursor;
+								userCursor = userCursor->next;
+								userCursor->prev = userCursorPrev;
+							} 
+							/* Initialize */
+							strncpy(userCursor->name, userName, 80);
+							userCursor->connfd = connfd;
+							userCursor->timeJoined = time(0);
+							userCursor->next = 0;
+							V(&lists);
+							/* Unlock the lists */
+
+							char message[MAX_LINE];
+							char motdverb[] = "MOTD ";
+
+							strcpy(message, motdverb);
+							strcat(message, motd);
+							strcat(message, ENDVERB);
+
+							write(connfd, hiSend, strlen(hiSend));
+							write(connfd, message, strlen(message));
+	                        write(connfd, "\n\n", 2);
+							usersConnected++;
+							connected = true;
+
+							if(verbose){
+								sfwrite(&stdoutMutex, stdout, "%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							}
+						} else {
+							if(!uniqueName){
+								char error[] = "ERR 00 'USER NAME TAKEN.' \r\n\r\n";
+								write(connfd, error, strlen(error));
+								write(connfd, BYE, strlen(BYE));
+								close(connfd);
+							} else if(!acctExists){
+								char error[] = "ERR 01 'USER NOT AVAILABLE.' \r\n\r\n";
+								write(connfd, error, strlen(error));
+								write(connfd, BYE, strlen(BYE));
+								close(connfd);
+							} else {
+								char error[] = "ERR 02 'BAD PASSWORD.' \r\n\r\n";
+								write(connfd, error, strlen(error));
+								write(connfd, BYE, strlen(BYE));
+								close(connfd);
+							}
+						}
+					} else {
+						cmd = strstr(buf, IAMNEW);
+						if(cmd != NULL){
+							if(verbose){
+								sfwrite(&stdoutMutex, stdout, "%sIAMNEW received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+							}
+							char name[strlen(buf)];
+							memcpy(name, &buf[7], strlen(buf) - 2);
+							char hi[] = "HINEW ";
+
+							char* userName = strtok(name, ENDVERB);
+							userName = strtok(userName, " ");
+
+							char hiSend[strlen(name) + strlen(hi) + 6];
+							strcpy(hiSend, hi);
+							strcat(hiSend, name);
+							strcat(hiSend, ENDVERB);
+							/* hiSend now contains HINEW <name> <ENDVERB> */
+
+							bool notDuplicate = true;
+
+							/* Lock the lists */
+							P(&lists);
+							if(accountsInFile > 0){
+								notDuplicate = true;
+								AuserCursor = AHEAD;
+								if(!strcmp(userName, AuserCursor->name)){
+									notDuplicate = false;
+								}
+								while(AuserCursor->next != 0){
+									AuserCursor = AuserCursor->next;
+									if(!strcmp(userName, AuserCursor->name)){
+										notDuplicate = false;
+									}
+								}
+							} 
+							V(&lists);
+
+							if(notDuplicate) {
+								write(connfd, hiSend, strlen(hiSend));
+								if(verbose){
+									sfwrite(&stdoutMutex, stdout, "%sHINEW sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+								}
+
+								bzero(buf, MAX_LINE);
+								read(connfd, buf, MAX_LINE);
+								cmd = strstr(buf, ENDVERB);
+								charLeft = MAX_LINE;
+								verbFound = false;
+								if(cmd == NULL){
+									while(charLeft > 0){
+										char buf2[charLeft];
+										read(connfd, buf2, charLeft);
+										strcpy(buf+strlen(buf), buf2);
+
+										cmd = strstr(buf, ENDVERB);
+										if(cmd != NULL){
+											verbFound = true;
+											break;
+										}
+										charLeft = charLeft - strlen(buf);
+									}
+								} else {
+									verbFound = true;
+								}
+								if(verbFound){
+									cmd = strstr(buf, NEWPASS);
+									if(cmd != NULL){
+										if(verbose){
+											sfwrite(&stdoutMutex, stdout, "%sNEWPASS received\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+										}
+										char pass[strlen(buf)];
+										memcpy(pass, &buf[7], strlen(buf) - 2);
+										char hi[] = "NEWPASS";
+
+										char* passWord = strtok(pass, ENDVERB);
+										passWord = strtok(passWord, " ");
+
+										char passSend[strlen(pass) + strlen(hi) + 4];
+										strcpy(passSend, hi);
+										strcat(passSend, pass);
+										strcat(passSend, ENDVERB);
+
+										/* LET'S ADD SOME SALT BEFORE WE HASH */
+										unsigned char salt[5];
+										RAND_bytes(salt, 5);
+
+										char passwordHash[strlen(passWord) + 5];
+										strcpy(passwordHash, passWord);
+										//strcat(passwordHash, (char*)salt);
+										/*
+										testPrint((char*)salt);
+										testPrint(passwordHash);
+										*/
+										/* HASHING */
+										unsigned char hash[SHA256_DIGEST_LENGTH];
+										SHA256_CTX sha256;
+										SHA256_Init(&sha256);
+										SHA256_Update(&sha256, passWord, strlen(passWord));
+										SHA256_Final(hash, &sha256);
+
+										char outputBuffer[65];
+										int i = 0;
+										for(; i < SHA256_DIGEST_LENGTH; i++){
+											sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+										}
+										outputBuffer[64] = 0;
+
+										/* Test if password meets criteria */
+										bool valid = validPassword(passWord);
+
+										if(valid){
+											char validP[] = "SSAPWEN \r\n\r\n";
+											write(connfd, validP, strlen(validP));
+											if(verbose){
+												sfwrite(&stdoutMutex, stdout, "%sSSAPWEN sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+											}
+
+											char hi[] = "HI ";
+											char hiSend[strlen(name) + strlen(hi) + strlen(ENDVERB) + 1];
+											strcpy(hiSend, hi);
+											strcat(hiSend, name);
+											strcat(hiSend, ENDVERB);
+											strcat(hiSend, "\0");
+
+											/* Lock the lists */
+											P(&lists);
+											/* Initialize user */
+											if(usersConnected){
+												userCursor->next = malloc(sizeof(struct user));
+												userCursorPrev = userCursor;
+												userCursor = userCursor->next;
+												userCursor->prev = userCursorPrev;
+											} 
+											
+											strncpy(userCursor->name, userName, 80);
+											userCursor->connfd = connfd;
+											userCursor->timeJoined = time(0);
+											userCursor->next = 0;
+
+											/* Initialize account */
+											if(accountsInFile){
+												AuserCursor->next = malloc(sizeof(struct user));
+												AuserCursorPrev = AuserCursor;
+												AuserCursor = AuserCursor->next;
+												AuserCursor->prev = AuserCursorPrev;
+											} 
+											
+											strncpy(AuserCursor->name, userName, 80);
+											AuserCursor->next = 0;
+											strncpy(AuserCursor->pwd, outputBuffer, 65);
+											strncpy((char*)(AuserCursor->salt), (char*)salt, 5);
+											V(&lists);
+											/* Unlock the lists */
+
+											write(connfd, hiSend, strlen(hiSend));
+											if(verbose){
+												sfwrite(&stdoutMutex, stdout, "%sHI sent\n%s", VERBOSE_TEXT, NORMAL_TEXT);
+											}
+
+											char message[MAX_LINE];
+											char motdverb[] = "MOTD ";
+
+											strcpy(message, motdverb);
+											strcat(message, motd);
+											strcat(message, ENDVERB);
+
+											write(connfd, message, strlen(message));
+											write(connfd, "\n\n", 2);
+											usersConnected++;
+											accountsInFile++;
+											connected = true;
+										} else {
+											char error[] = "ERR 02 'BAD PASSWORD' \r\n\r\n";
+											write(connfd, error, strlen(error));
+										}
+									} else {
+										char error[] = "ERR 100 'Expected NEWPASS' \r\n\r\n";
+										write(connfd, error, strlen(error));
+									}
+								}
+							} else {
+								char error[] = "ERR 00 'USER NAME TAKEN' \r\n\r\n";
+								write(connfd, error, strlen(error));
+							}
+						}
+					}
+				} else {
+					char error[] = "ERR 100 'Expected IAM or IAMNEW' \r\n\r\n";
+					write(connfd, error, strlen(error));
+				}
+			} else {
+				char error[] = "ERR 100 'Expected WOLFIE.' \r\n\r\n";
+				write(connfd, error, strlen(error));
+			}
+		} else {
+			char error[] = "ERR 100 'Verb not found.' \r\n\r\n";
+			write(connfd, error, strlen(error));
+		}
+
+		if(!connected){
+			write(connfd, BYE, strlen(BYE));
+			close(connfd);
+			pthread_exit(EXIT_SUCCESS);
+			return NULL;
+		}
+
+		if(connfd > maxfd){
+			maxfd = connfd;
+		}
+
+		if(!commRun){
+
+			pthread_create(&commT, NULL, communicate, NULL);
+			pthread_setname_np(commT, "COMMUNICATE");
+
+			commRun = true;
+		} else {
+			/* Communication thread already running. 
+			Send signal to interrupt thread. */
+			pthread_kill(commT, SIGUSR1);
+		}
+	}
 	return NULL;
 }
 
