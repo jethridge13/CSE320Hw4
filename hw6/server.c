@@ -24,6 +24,7 @@
 #define UTSIL "UTSIL "
 #define MSG "MSG"
 #define UOFF "UOFF "
+#define DEFAULT_THREAD_COUNT 2
 
 void help();
 void users();
@@ -112,8 +113,9 @@ int main(int argc, char **argv) {
 	int connfd;
 	int clientlen;
 	char* portNumber = NULL;
+	int threads = DEFAULT_THREAD_COUNT;
 
-	while((opt = getopt(argc, argv, "hv")) != -1) {
+	while((opt = getopt(argc, argv, "hvt:")) != -1) {
         switch(opt) {
             case 'h':
                 /* The help menu was selected */
@@ -125,7 +127,20 @@ int main(int argc, char **argv) {
             	verbose = true;
             	argumentsPassed++;
             	break;
+            case 't':
+            	/* Threads detected */
+            	threads = atoi(optarg);
+            	if(!threads){
+            		threads = DEFAULT_THREAD_COUNT;
+            	}
+            	break;
         }
+    }
+    pthread_t tid;
+    int i = 0;
+    for(; i < threads; i++){
+    	pthread_create(&tid, NULL, loginNew, NULL);
+		pthread_setname_np(tid, "LOGIN");
     }
     int addArgs = argc - optind;
 	if(optind < argc && (addArgs == 3 || addArgs == 2)) {
@@ -253,7 +268,11 @@ int main(int argc, char **argv) {
 	fd_set fdRead;
 	char cmd[MAX_LINE];
 	clientlen = sizeof(struct sockaddr_storage);
-	pthread_t tid;
+
+	/* Initialize queue */
+	QHEAD = malloc(sizeof(struct queueItem));
+	QHEAD->next = 0;
+	QHEAD->fd = -1;
 
 	while(true){
 		FD_ZERO(&fdRead);
@@ -298,8 +317,26 @@ int main(int argc, char **argv) {
 			sfwrite(&stdoutMutex, stdout, "%sServer established connection with %s (%s)\n",
 				NORMAL_TEXT, hostp->h_name, hostaddrp);
 
+			/*
 			pthread_create(&tid, NULL, login, &connfd);
 			pthread_setname_np(tid, "LOGIN");
+			*/
+
+			pthread_mutex_lock(&queueMutex);
+			QuserCursor = QHEAD;
+			if(QHEAD->fd == -1){
+				QHEAD->fd = connfd;
+			} else {
+				while(QuserCursor->next != 0){
+					QuserCursor = QuserCursor->next;
+				}
+				QuserCursor->next = malloc(sizeof(struct queueItem));
+				QuserCursor = QuserCursor->next;
+				QuserCursor->fd = connfd;
+				QuserCursor->next = 0;
+			}	
+			pthread_mutex_unlock(&queueMutex);
+			V(&queue);
 		}
 
 		/* Handle STDIN */
@@ -820,11 +857,12 @@ void *loginNew(){
 		P(&queue);
 		pthread_mutex_lock(&queueMutex);
 		QuserCursor = QHEAD;
-		int connfd = QuserCursor->fd;
 		if(QuserCursor->next != 0){
 			QHEAD = QuserCursor->next;
 			free(QuserCursor);
 		}
+		int connfd = QuserCursor->fd;
+		QuserCursor->fd = -1;
 		pthread_mutex_unlock(&queueMutex);
 		//pthread_t id = pthread_self();
 
