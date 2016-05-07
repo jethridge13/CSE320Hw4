@@ -1,0 +1,75 @@
+05/06/16-07:57pm, g, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-07:57pm, h, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-07:58pm, g, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-07:58pm, g, CMD, /time, success, client
+05/06/16-07:58pm, g, CMD, /listu, success, client
+05/06/16-07:58pm, h, CMD, /time, success, client
+05/06/16-07:58pm, g, CMD, /chat, success, client
+05/06/16-07:58pm, h, MSG, from, g
+05/06/16-07:58pm, g, MSG, to, g
+05/06/16-07:58pm, h, MSG, from, g
+05/06/16-07:58pm, g, MSG, to, g
+05/06/16-07:58pm, h, MSG, from, g
+05/06/16-07:58pm, g, MSG, to, g
+05/06/16-07:58pm, g, CMD, /close, success, chat
+05/06/16-07:58pm, h, CMD, /close, success, chat
+05/06/16-07:58pm, g, CMD, /audit, success, client
+05/06/16-07:58pm, g, CMD, /logout, success, client
+05/06/16-07:58pm, g, LOGOUT, intentional
+05/06/16-07:58pm, h, CMD, /logout, success, client
+05/06/16-07:59pm, h, CMD, /logout, success, client
+05/06/16-08:10pm, g, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-08:10pm, h, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-08:10pm, h, CMD, /time, success, client
+05/06/16-08:10pm, h, CMD, /chat, success, client
+05/06/16-08:10pm, g, MSG, from, h
+05/06/16-08:10pm, h, MSG, to, h
+05/06/16-08:10pm, g, MSG, from, h
+05/06/16-08:10pm, h, MSG, to, h
+05/06/16-08:10pm, g, MSG, from, h
+05/06/16-08:10pm, h, MSG, to, h
+05/06/16-08:10pm, g, MSG, from, h
+05/06/16-08:10pm, h, MSG, to, h
+05/06/16-08:10pm, h, MSG, from, g
+05/06/16-08:10pm, g, MSG, to, g
+05/06/16-08:10pm, h, MSG, to, h
+05/06/16-08:10pm, g, MSG, from, h
+05/06/16-08:10pm, g, MSG, to, g
+05/06/16-08:10pm, h, MSG, from, g
+05/06/16-08:10pm, h, CMD, /close, success, chat
+05/06/16-08:10pm, g, CMD, /close, success, chat
+05/06/16-08:11pm, h, CMD, /chat, success, client
+05/06/16-08:11pm, h, MSG, to, h
+05/06/16-08:11pm, g, MSG, from, h
+05/06/16-08:15pm, g, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-08:15pm, h, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-08:15pm, h, CMD, /time, success, client
+05/06/16-08:15pm, h, CMD, /listu, success, client
+05/06/16-08:15pm, h, CMD, /chat, success, client
+05/06/16-08:15pm, g, MSG, from, h
+05/06/16-08:15pm, h, MSG, to, h
+05/06/16-08:15pm, g, MSG, from, h
+05/06/16-08:15pm, h, MSG, to, h
+05/06/16-08:15pm, g, MSG, from, h
+05/06/16-08:15pm, h, MSG, to, h
+05/06/16-08:15pm, h, MSG, from, g
+05/06/16-08:15pm, g, MSG, to, g
+05/06/16-08:15pm, g, CMD, /close, success, chat
+05/06/16-08:15pm, h, CMD, /close, success, chat
+05/06/16-08:15pm, g, CMD, /time, success, client
+05/06/16-08:15pm, h, CMD, /time, success, client
+05/06/16-08:16pm, h, CMD, /chat, success, client
+05/06/16-08:16pm, g, MSG, from, h
+05/06/16-08:16pm, h, MSG, to, h
+05/06/16-08:16pm, g, MSG, from, h
+05/06/16-08:16pm, h, MSG, to, h
+05/06/16-08:16pm, h, MSG, from, g
+05/06/16-08:16pm, g, MSG, to, g
+05/06/16-08:16pm, g, MSG, from, h
+05/06/16-08:16pm, h, MSG, to, h
+05/06/16-08:16pm, g, MSG, to, g
+05/06/16-08:16pm, h, MSG, from, g
+05/06/16-08:16pm, h, CMD, /close, success, chat
+05/06/16-08:16pm, g, CMD, /close, success, chat
+05/06/16-08:16pm, g, LOGOUT, intentional
+05/06/16-08:16pm, h, LOGOUT, intentional

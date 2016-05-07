@@ -14,12 +14,19 @@ bool verbose = false;
 bool chatOpen = false;
 pid_t childID;
 pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+int sv[2]; //SOCKETPAIR FD
+int chatfd;
 
 void testPrint(char* string){
     FILE *file;
     file = fopen("test.txt", "a");
     fprintf(file, "%s", string);
     fclose(file);
+}
+
+void chatClose(int sig) {
+    chatOpen = false;
+    chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
 }
 
 int main(int argc, char** argv){
@@ -32,6 +39,9 @@ int main(int argc, char** argv){
     char* auditFile = NULL;
     char auditBuffer[200];
     FILE* audit = NULL;
+    signal(SIGCHLD, chatClose);
+    chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+
 	while((opt = getopt(argc, argv, "a:hcv")) != -1) {
         switch(opt) {
             case 'h':
@@ -356,9 +366,6 @@ int main(int argc, char** argv){
     char* toPtr;
     char* fromPtr;
     char* msgPtr;
-
-    int sv[2]; //SOCKETPAIR FD
-    int chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
 
     if(chatfd < 0){
         sfwrite(&stdoutMutex, stderr, "%sError creating socket.\n", ERROR_TEXT);
