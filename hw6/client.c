@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include "csapp.h"
+#include "sfwrite.c"
 
 #define NORMAL_TEXT "\x1B[0m"
 #define ERROR_TEXT "\x1B[1;31m"
@@ -12,7 +13,9 @@ void usage();
 bool verbose = false;
 bool chatOpen = false;
 pid_t childID;
-
+pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+int sv[2]; //SOCKETPAIR FD
+int chatfd;
 
 void testPrint(char* string){
     FILE *file;
@@ -21,13 +24,25 @@ void testPrint(char* string){
     fclose(file);
 }
 
+void chatClose(int sig) {
+    chatOpen = false;
+    chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+}
+
 int main(int argc, char** argv){
 	int opt, port = 0;
 	bool createUser = false;
+    bool createAudit = false;
 	char* name = NULL;
 	char* serverIP = NULL;
 	char* serverPort = NULL;
-	while((opt = getopt(argc, argv, "hcv")) != -1) {
+    char* auditFile = NULL;
+    char auditBuffer[200];
+    FILE* audit = NULL;
+    signal(SIGCHLD, chatClose);
+    chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+
+	while((opt = getopt(argc, argv, "a:hcv")) != -1) {
         switch(opt) {
             case 'h':
                 /* The help menu was selected */
@@ -41,21 +56,26 @@ int main(int argc, char** argv){
             case 'c':
             	createUser = true;
             	break;
+            case 'a':
+                createAudit = true;
+                auditFile = optarg;
+                break;
         }
     }
+
 	if(optind < argc && (argc - optind) == 3) {
         name = argv[optind++];
         serverIP = argv[optind++];
         serverPort = argv[optind++];
     } else {
         if((argc - optind) <= 0) {
-            fprintf(stderr, "\x1B[1;31mMissing NAME and SERVER_IP and SERVER_PORT.\n");
+            sfwrite(&stdoutMutex, stderr, "\x1B[1;31mMissing NAME and SERVER_IP and SERVER_PORT.\n");
         } else if((argc - optind) == 1) {
-            fprintf(stderr, "\x1B[1;31mMissing SERVER_IP and SERVER_PORT.\n");
+            sfwrite(&stdoutMutex, stderr, "\x1B[1;31mMissing SERVER_IP and SERVER_PORT.\n");
         } else if ((argc - optind) == 2) {
-        	fprintf(stderr, "\x1B[1;31mMissing SERVER_PORT\n");
+        	sfwrite(&stdoutMutex, stderr, "\x1B[1;31mMissing SERVER_PORT\n");
         }else {
-            fprintf(stderr, "\x1B[1;31mToo many arguments provided.\n");
+            sfwrite(&stdoutMutex, stderr, "\x1B[1;31mToo many arguments provided.\n");
         }
         usage();
         exit(EXIT_FAILURE);
@@ -63,19 +83,30 @@ int main(int argc, char** argv){
 
     port = atoi(serverPort);
     if(!port){
-        fprintf(stderr, "%sInvalid PORT_NUMBER\n", ERROR_TEXT);
+        sfwrite(&stdoutMutex, stderr, "%sInvalid PORT_NUMBER\n", ERROR_TEXT);
         usage();
     }
 
     /* TODO Remove this */
     if(verbose){
-    	printf("\x1B[1;34mNAME: %s\n", name);
+    	sfwrite(&stdoutMutex, stdout, "\x1B[1;34mNAME: %s\n", name);
     	if(createUser){
-    		printf("CREATE NEW USER");
+    		sfwrite(&stdoutMutex, stdout, "CREATE NEW USER");
     	}
-    	printf("SERVER_IP: %s\n", serverIP);
-    	printf("SERVER_PORT: %s\n", serverPort);
+    	sfwrite(&stdoutMutex, stdout, "SERVER_IP: %s\n", serverIP);
+    	sfwrite(&stdoutMutex, stdout, "SERVER_PORT: %s\n", serverPort);
     }
+
+    if(createAudit == true) {
+        audit = fopen(auditFile, "a+");
+    }
+    else {
+        audit = fopen("audit.log", "a+");
+    }
+
+    char timeStr[50];
+    time_t curtime;
+    struct tm * timeStruct;
 
     char input[MAX_LINE]; //CLIENT IO COMMANDS
 
@@ -85,7 +116,7 @@ int main(int argc, char** argv){
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if(sockfd < 0){
-        printf("%sError creating socket.\n", ERROR_TEXT);
+        sfwrite(&stdoutMutex, stderr, "%sError creating socket.\n", ERROR_TEXT);
         return EXIT_FAILURE;
     }
 
@@ -95,7 +126,7 @@ int main(int argc, char** argv){
     inet_pton(AF_INET,serverPort, &(serveraddr.sin_addr));
  
     if(connect(sockfd, (struct sockaddr*)&serveraddr, sizeof(serveraddr))) {
-        printf("%sCould not connect to server.\n", ERROR_TEXT);
+        sfwrite(&stdoutMutex, stderr, "%sCould not connect to server.\n", ERROR_TEXT);
         return EXIT_FAILURE;
     }
 
@@ -106,18 +137,26 @@ int main(int argc, char** argv){
     write(sockfd, "WOLFIE \r\n\r\n", 11);
     if(verbose){
         char wolfieSent[] = "WOLFIE sent\n";
-        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-        write(1, wolfieSent, strlen(wolfieSent));
+        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+        sfwrite(&stdoutMutex, stdout, wolfieSent);
     }
     memset(output, 0, sizeof(output));
     read(sockfd, output, MAX_LINE);
     if(strstr(output, "EIFLOW ") == output && verbose) {
         char eiflowReceived[] = "EIFLOW received\n";
-        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-        write(1, eiflowReceived, strlen(eiflowReceived));
+        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+        sfwrite(&stdoutMutex, stdout, eiflowReceived);
     }
     if(strstr(output, "EIFLOW ") != output) {
-        write(1, loginError, strlen(loginError));
+        sfwrite(&stdoutMutex, stdout, loginError);
+
+        curtime = time(NULL);
+        timeStruct = localtime(&curtime);
+        strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+        fclose(audit);
         return EXIT_FAILURE;
     }
     /*CREATE NEW USER*/
@@ -129,22 +168,30 @@ int main(int argc, char** argv){
         write(sockfd, output, strlen(output));
         if(verbose){
             char iamnewSent[] = "IAMNEW sent\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, iamnewSent, strlen(iamnewSent));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, iamnewSent);
         }
 
         memset(output, 0, sizeof(output));
         read(sockfd, output, MAX_LINE);
         if(strstr(output, "HINEW ") == output && verbose) {
             char hinewReceived[] = "HINEW received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, hinewReceived, strlen(hinewReceived));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, hinewReceived);
         }
         if(strstr(output, "HINEW ") != output) {
             char accExists[] = "Account with username already exists or already logged in!\n";
-            write(1, accExists, strlen(accExists));
+            sfwrite(&stdoutMutex, stdout, accExists);
             if(verbose)
-                write(1, output, strlen(output));
+                sfwrite(&stdoutMutex, stdout, output);
+
+            curtime = time(NULL);
+            timeStruct = localtime(&curtime);
+            strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+            fclose(audit);
             return EXIT_FAILURE;
         }
 
@@ -160,31 +207,39 @@ int main(int argc, char** argv){
         write(sockfd, output, strlen(output));
         if(verbose){
             char newpassSent[] = "NEWPASS sent\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, newpassSent, strlen(newpassSent));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, newpassSent);
         }
 
         memset(output, 0, sizeof(output));
         read(sockfd, output, MAX_LINE);
         if(strstr(output, "SSAPWEN ") == output && verbose) {
             char ssapwenReceived[] = "SSAPWEN received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, ssapwenReceived, strlen(ssapwenReceived));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, ssapwenReceived);
             char hiReceived[] = "HI received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, hiReceived, strlen(hiReceived));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, hiReceived);
         }
         if(strstr(output, "SSAPWEN ") != output) {
             char badPass[] = "Improper password!\n";
-            write(1, badPass, strlen(badPass));
+            sfwrite(&stdoutMutex, stdout, badPass);
             if(verbose)
-                write(1, output + 12, strlen(output - 12));
+                sfwrite(&stdoutMutex, stdout, output + 12);
+
+            curtime = time(NULL);
+            timeStruct = localtime(&curtime);
+            strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+            fclose(audit);
             return EXIT_FAILURE;
         }
         memset(output, 0, sizeof(output));
         read(sockfd, output, MAX_LINE);
         char loginSuccess[] = "\nLogged in! Message of the Day:\n";
-        write(1, loginSuccess, strlen(loginSuccess));
+        sfwrite(&stdoutMutex, stdout, loginSuccess);
         char* motdPtr = strstr(output, "MOTD ");
         while(motdPtr == NULL){
             memset(output, 0, sizeof(output));
@@ -193,8 +248,14 @@ int main(int argc, char** argv){
         }
         motdPtr += 5;
         strtok(motdPtr, "\r\n");
-        write(1, motdPtr, strlen(motdPtr));
-        write(1, "\n", 1);
+        sfwrite(&stdoutMutex, stdout, motdPtr);
+        sfwrite(&stdoutMutex, stdout, "\n");
+
+        curtime = time(NULL);
+        timeStruct = localtime(&curtime);
+        strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
     }
 
     /*ELSE LOG IN*/
@@ -206,27 +267,35 @@ int main(int argc, char** argv){
         write(sockfd, output, strlen(output));
         if(verbose){
             char iamSent[] = "IAM sent\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, iamSent, strlen(iamSent));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, iamSent);
         }
 
         memset(output, 0, sizeof(output));
         read(sockfd, output, MAX_LINE);
         if(strstr(output, "AUTH ") == output && verbose) {
             char authReceived[] = "AUTH received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, authReceived, strlen(authReceived));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, authReceived);
         }
         if(strstr(output, "AUTH ") != output) {
             char noUser[] = "Account with username doesn't exist or already logged in!\n";
-            write(1, noUser, strlen(noUser));
+            sfwrite(&stdoutMutex, stdout, noUser);
             if(verbose)
-                write(1, output, strlen(output));
+                sfwrite(&stdoutMutex, stdout, output);
+
+            curtime = time(NULL);
+            timeStruct = localtime(&curtime);
+            strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+            fclose(audit);
             return EXIT_FAILURE;
         }
 
         char enterPass[] = "Enter password: ";
-        write(1, enterPass, strlen(enterPass));
+        sfwrite(&stdoutMutex, stdout, enterPass);
 
         char pass[MAX_LINE - 20];
         fgets(pass, MAX_LINE - 26, stdin);
@@ -237,26 +306,34 @@ int main(int argc, char** argv){
         write(sockfd, output, strlen(output));
         if(verbose){
             char newpassSent[] = "PASS sent\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, newpassSent, strlen(newpassSent));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, newpassSent);
         }
 
         memset(output, 0, sizeof(output));
         read(sockfd, output, MAX_LINE);
         if(strstr(output, "SSAP ") == output && verbose) {
             char ssapReceived[] = "SSAP received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, ssapReceived, strlen(ssapReceived));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, ssapReceived);
             char hiReceived[] = "HI received\n";
-            write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-            write(1, hiReceived, strlen(hiReceived));
-            write(1, output, strlen(output));
+            sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+            sfwrite(&stdoutMutex, stdout, hiReceived);
+            sfwrite(&stdoutMutex, stdout, output);
         }
         if(strstr(output, "SSAP ") != output) {
             char badPass[] = "Failed to log in!\n";
-            write(1, badPass, strlen(badPass));
+            sfwrite(&stdoutMutex, stdout, badPass);
             if(verbose)
-                write(1, output + 9, strlen(output - 9));
+                sfwrite(&stdoutMutex, stdout, output + 9);
+
+            curtime = time(NULL);
+            timeStruct = localtime(&curtime);
+            strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+            sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, fail, %s\n", timeStr, name, serverIP, serverPort, strtok(output, "\r\n"));
+            write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+            fclose(audit);
             return EXIT_FAILURE;
         }
         char* motdPtr = strstr(output, "MOTD ");
@@ -267,8 +344,14 @@ int main(int argc, char** argv){
         }
         motdPtr += 5;
         strtok(motdPtr, "\r\n");
-        write(1, motdPtr, strlen(motdPtr));
-        write(1, "\n", 1);
+        sfwrite(&stdoutMutex, stdout, motdPtr);
+        sfwrite(&stdoutMutex, stdout, "\n");
+
+        curtime = time(NULL);
+        timeStruct = localtime(&curtime);
+        strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+        sprintf(auditBuffer, "%s, %s, LOGIN, %s:%s, success, %s\n", timeStr, name, serverIP, serverPort, motdPtr);
+        write(fileno(audit), auditBuffer, strlen(auditBuffer));
     }
 
     /*MULTIPLEX*/
@@ -284,11 +367,8 @@ int main(int argc, char** argv){
     char* fromPtr;
     char* msgPtr;
 
-    int sv[2]; //SOCKETPAIR FD
-    int chatfd = socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
-
     if(chatfd < 0){
-        printf("%sError creating socket.\n", ERROR_TEXT);
+        sfwrite(&stdoutMutex, stderr, "%sError creating socket.\n", ERROR_TEXT);
         return EXIT_FAILURE;
     }
 
@@ -315,8 +395,8 @@ int main(int argc, char** argv){
             if(strstr(output, "EMIT ") == output) {
                 if(verbose){
                     char emitReceived[] = "EMIT received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, emitReceived, strlen(emitReceived));
+                    sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                    sfwrite(&stdoutMutex, stdout, emitReceived);
                 }
                 strtok(output, " \r\n");
                 timeInt = atoi(strtok(NULL, " \r\n"));
@@ -324,14 +404,22 @@ int main(int argc, char** argv){
                 timeInt = timeInt % 3600;
                 minutes = timeInt / 60;
                 seconds = timeInt % 60;
-                printf("%s%i%s%i%s%i%s", "Connected for ", hours, " hour(s), ", minutes, " minute(s), and ", seconds, " second(s)\n");
+                sfwrite(&stdoutMutex, stdout, "%s%i%s%i%s%i%s", "Connected for ", hours, " hour(s), ", minutes, " minute(s), and ", seconds, " second(s)\n");
             }
             else if(strstr(output, "BYE \r\n\r\n") != NULL) {
                 if(verbose){
                     char byeReceived[] = "BYE received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, byeReceived, strlen(byeReceived));
+                    sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                    sfwrite(&stdoutMutex, stdout, byeReceived);
                 }
+
+                curtime = time(NULL);
+                timeStruct = localtime(&curtime);
+                strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                sprintf(auditBuffer, "%s, %s, LOGOUT, intentional\n", timeStr, name);
+                write(fileno(audit), auditBuffer, strlen(auditBuffer));
+
+                fclose(audit);
                 close(sockfd);
                 kill(childID, SIGKILL);
                 return EXIT_SUCCESS;
@@ -339,21 +427,23 @@ int main(int argc, char** argv){
             else if(strstr(output, "UTSIL ") == output) {
                 if(verbose){
                     char utsilReceived[] = "UTSIL received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, utsilReceived, strlen(utsilReceived));
+                    sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                    sfwrite(&stdoutMutex, stdout, utsilReceived);
                 }
                 strtok(output, " \r\n");
                 token = strtok(NULL, " \r\n");
                 while(token != NULL) {
-                    printf("%s\n", token);
+                    sfwrite(&stdoutMutex, stdout, "%s\n", token);
                     token = strtok(NULL, " \r\n");
                 }
+            }
+            else if(strstr(output, "UOFF ") == output) {
             }
             else if(strstr(output, "MSG ") == output) {
                 if(verbose){
                     char msgReceived[] = "MSG received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, msgReceived, strlen(msgReceived));
+                    sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                    sfwrite(&stdoutMutex, stdout, msgReceived);
                 }
 
                 char outputCpy[strlen(output)];
@@ -364,6 +454,18 @@ int main(int argc, char** argv){
                 token = strtok(NULL, " \r\n");
                 fromPtr = token;
 
+                curtime = time(NULL);
+                timeStruct = localtime(&curtime);
+                strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                if(!strcmp(fromPtr, name)) {
+                    sprintf(auditBuffer, "%s, %s, MSG, to, %s\n", timeStr, name, fromPtr);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
+                else {
+                    sprintf(auditBuffer, "%s, %s, MSG, from, %s\n", timeStr, toPtr, fromPtr);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
+
                 if(chatOpen == false) {
                     childID = fork();
                     if(childID == 0){
@@ -371,22 +473,23 @@ int main(int argc, char** argv){
 
                         char fdStr[12];
                         snprintf(fdStr, 12, "%i", sv[1]);
-                        printf("%s", fdStr);
+                        char auditfdStr[12];
+                        snprintf(auditfdStr, 12, "%i", fileno(audit));
 
                         int status = 1;
 
                         if(!strcmp(fromPtr, name)) {
-                            char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, fromPtr, toPtr, NULL};
+                            char* xterm[] = {"xterm", "-geometry", "45x35+0", "-T", toPtr, "-e", "./chat", fdStr, auditfdStr, fromPtr, toPtr, NULL};
                             status = execv("/usr/bin/xterm", xterm);
                         }
                         else {
-                            char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, toPtr, fromPtr, NULL};
+                            char* xterm[] = {"xterm", "-geometry", "45x35+500", "-T", fromPtr, "-e", "./chat", fdStr, auditfdStr, toPtr, fromPtr, NULL};
                             status = execv("/usr/bin/xterm", xterm);
                         }
 
                         if(status){
                             char* statusLine = "Couldn't create chat window!\n";
-                            write(1, statusLine, strlen(statusLine));
+                            sfwrite(&stdoutMutex, stderr, statusLine, strlen(statusLine));
                             kill(getpid(), SIGKILL);
                         }
                         chatOpen = true;
@@ -399,7 +502,7 @@ int main(int argc, char** argv){
                 write(sv[0], outputCpy, strlen(outputCpy));
             }
             else {
-                write(1, output, strlen(output));
+                sfwrite(&stdoutMutex, stdout, output);
             }
         }
 
@@ -410,8 +513,8 @@ int main(int argc, char** argv){
             if(strstr(output, "MSG ") == output) {
                 if(verbose){
                     char msgReceived[] = "MSG received\n";
-                    write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                    write(1, msgReceived, strlen(msgReceived));
+                    sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                    sfwrite(&stdoutMutex, stdout, msgReceived);
                 }
             write(sockfd, output, strlen(output));
             }
@@ -422,38 +525,72 @@ int main(int argc, char** argv){
             if(fgets(input, MAX_LINE - 6, stdin) != NULL) {
                 if(*input == '\n')
                     continue;
-                if(!strcmp(input, "/time\n")) {
+                else if(!strcmp(input, "/audit\n")) {
+                    rewind(audit);
+                    while(fgets(auditBuffer, 200, audit) != NULL)
+                        sfwrite(&stdoutMutex, stdout, auditBuffer);
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /audit, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
+                else if(!strcmp(input, "/time\n")) {
                     if(verbose){
                         char timeSent[] = "TIME sent\n";
-                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                        write(1, timeSent, strlen(timeSent));
+                        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                        sfwrite(&stdoutMutex, stdout, timeSent);
                     }
                     write(sockfd, "TIME \r\n\r\n\0", 10);
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /time, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/help\n")) {
-                    printf(
+                    sfwrite(&stdoutMutex, stdout,
                         "CLIENT COMMANDS:\n"
                         "/time          Displays how long the client has been connected to server.\n"
                         "/help          Lists all client commands. The thing you just typed in.\n"
                         "/logout        Disconnects client from server.\n"
                         "/listu         Lists all clients connected to server.\n"
                         "/chat <TO> <MESSAGE>         Starts chat.\n");
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /help, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/logout\n")) {
                     if(verbose){
                         char byeSent[] = "BYE sent\n";
-                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                        write(1, byeSent, strlen(byeSent));
+                        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                        sfwrite(&stdoutMutex, stdout, byeSent);
                     }
                     write(sockfd, "BYE \r\n\r\n\0", 9);
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /logout, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(!strcmp(input, "/listu\n")) {
                     if(verbose){
                         char listuSent[] = "LISTU sent\n";
-                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                        write(1, listuSent, strlen(listuSent));
+                        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                        sfwrite(&stdoutMutex, stdout, listuSent);
                     }
                     write(sockfd, "LISTU \r\n\r\n\0", 11);
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /listu, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
                 else if(strstr(input, "/chat") == input) {
                     strtok(input, " \r\n");
@@ -461,8 +598,14 @@ int main(int argc, char** argv){
                     if(token != NULL)
                         toPtr = token;
                     else {
-                        printf("Invalid chat format. Enter /help for a list of commands.\n");
+                        sfwrite(&stdoutMutex, stdout, "Invalid chat format. Enter /help for a list of commands.\n");
                         fflush(stdout);
+
+                        curtime = time(NULL);
+                        timeStruct = localtime(&curtime);
+                        strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                        sprintf(auditBuffer, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        write(fileno(audit), auditBuffer, strlen(auditBuffer));
                         continue;
     
                     }
@@ -470,14 +613,20 @@ int main(int argc, char** argv){
                     if(token != NULL)
                         msgPtr = token;
                     else {
-                        printf("Invalid chat format. Enter /help for a list of commands.\n");
+                        sfwrite(&stdoutMutex, stdout, "Invalid chat format. Enter /help for a list of commands.\n");
+
+                        curtime = time(NULL);
+                        timeStruct = localtime(&curtime);
+                        strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                        sprintf(auditBuffer, "%s, %s, CMD, /chat, fail, client\n", timeStr, name);
+                        write(fileno(audit), auditBuffer, strlen(auditBuffer));
                         fflush(stdout);
                         continue;
                     }
                     if(verbose){
                         char listuSent[] = "MSG sent\n";
-                        write(1, VERBOSE_TEXT, strlen(VERBOSE_TEXT));
-                        write(1, listuSent, strlen(listuSent));
+                        sfwrite(&stdoutMutex, stdout, VERBOSE_TEXT);
+                        sfwrite(&stdoutMutex, stdout, listuSent);
                     }
                     write(sockfd, "MSG ", 4);
                     write(sockfd, toPtr, strlen(toPtr));
@@ -486,13 +635,22 @@ int main(int argc, char** argv){
                     write(sockfd, " ", 1);
                     write(sockfd, msgPtr, strlen(msgPtr));
                     write(sockfd, " \r\n\r\n\0", 6);
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, /chat, success, client\n", timeStr, name);
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
                 }
-                else
-                    printf("%s\n", "Invalid command. Enter /help for a list of commands.");
-            }
-            else {
-                strcat(input, " \r\n\r\n\0");
-                write(sockfd, input, strlen(input)+1);
+                else {
+                    sfwrite(&stdoutMutex, stdout, "%s\n", "Invalid command. Enter /help for a list of commands.");
+
+                    curtime = time(NULL);
+                    timeStruct = localtime(&curtime);
+                    strftime(timeStr, 50, "%m/%d/%y-%I:%M%P", timeStruct);
+                    sprintf(auditBuffer, "%s, %s, CMD, %s, fail, client\n", timeStr, name, strtok(input, "\n"));
+                    write(fileno(audit), auditBuffer, strlen(auditBuffer));
+                }
             }
         }
 
@@ -504,8 +662,8 @@ int main(int argc, char** argv){
 }
 
 void usage(){
-	printf(
-		"\n\x1B[0m ./client [-hcv] NAME SERVER_IP SERVER_PORT\n"
+	sfwrite(&stdoutMutex, stdout,
+		"\n\x1B[0m ./client [-hcv] [-a FILE] NAME SERVER_IP SERVER_PORT\n"
         "-a FILE        Path to the audit log file.\n"
 		"-h 			Displays this help menu and returns EXIT_SUCCESS.\n"
 		"-c 			Requests to server to create a new user.\n"
