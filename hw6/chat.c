@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include "csapp.h"
+#include "sfwrite.c"
 
 #define MAX_LINE 1024
 
@@ -8,8 +9,9 @@ int main(int argc, char** argv){
 	int chatfd = atoi(argv[1]);
 	char* fromName = argv[2];
 	char* toName = argv[3];
+    pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
 
-	printf("Now chatting with %s\n", toName);
+	sfwrite(&stdoutMutex, stdout, "Now chatting with %s\n", toName);
 
     /*MULTIPLEX*/
     int selectRet = 0;
@@ -51,14 +53,14 @@ int main(int argc, char** argv){
                 token = strtok(NULL, "\r\n");
                 msgPtr = token;
                 if(!strcmp(fromPtr, toName)) {
-	                write(1, "< ", 2);
-	                write(1, msgPtr, strlen(msgPtr));
-	                write(1, "\n", 2);
+	                sfwrite(&stdoutMutex, stdout, "< ", 2);
+	                sfwrite(&stdoutMutex, stdout, msgPtr, strlen(msgPtr));
+	                sfwrite(&stdoutMutex, stdout, "\n", 2);
 	            }
 	            else {
-	                write(1, "> ", 2);
-	                write(1, msgPtr, strlen(msgPtr));
-	                write(1, "\n", 2);
+                    sfwrite(&stdoutMutex, stdout, "> ", 2);
+                    sfwrite(&stdoutMutex, stdout, msgPtr, strlen(msgPtr));
+                    sfwrite(&stdoutMutex, stdout, "\n", 2);
 	            }
 	        }
         }

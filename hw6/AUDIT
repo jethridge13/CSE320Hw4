@@ -1,0 +1,10 @@
+05/06/16-06:09pm, h, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-06:09pm, h, CMD, /time, success, client
+05/06/16-06:09pm, h, CMD, /listu, success, client
+05/06/16-06:09pm, h, CMD, /logout, success, client
+05/06/16-06:09pm, h, LOGOUT, intentional
+05/06/16-06:09pm, g, LOGIN, 127.0.0.1:1111, success, ayo
+05/06/16-06:09pm, g, CMD, /time, success, client
+05/06/16-06:09pm, g, CMD, /listu, success, client
+05/06/16-06:09pm, g, CMD, /logout, success, client
+05/06/16-06:09pm, g, LOGOUT, intentional
